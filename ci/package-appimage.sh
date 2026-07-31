@@ -28,7 +28,9 @@ Icon=vcdplayer
 Categories=AudioVideo;Player;
 EOF
 
-cp img/icon.png "$workdir/vcdplayer.png"
+# linuxdeploy only accepts a fixed set of icon resolutions; our source
+# icon (1254x1254, square) isn't one of them.
+convert img/icon.png -resize 256x256 "$workdir/vcdplayer.png"
 
 tools_dir="$workdir/tools"
 mkdir -p "$tools_dir"
