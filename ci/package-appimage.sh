@@ -8,6 +8,8 @@ exe="$1"       # path to the built executable, e.g. build/VCDPlayer
 arch="$2"      # x86_64 or aarch64 (linuxdeploy/appimagetool release arch suffix)
 out_name="$3"  # AppImage base name, e.g. VCDPlayer-linux-x86_64
 
+repo_root="$(pwd)"
+
 # Nested AppImages (linuxdeploy, appimagetool) can't rely on FUSE being
 # available in a CI container; this tells the AppImage runtime to
 # extract-and-run itself instead of trying to mount.
@@ -28,9 +30,16 @@ Icon=vcdplayer
 Categories=AudioVideo;Player;
 EOF
 
-# linuxdeploy only accepts a fixed set of icon resolutions; our source
-# icon (1254x1254, square) isn't one of them.
-convert img/icon.png -resize 256x256 "$workdir/vcdplayer.png"
+# Pre-rendered sizes (see img/icon/, generated from img/icon-nobg.png) go
+# straight into the AppDir's hicolor icon theme, so the AppImage carries a
+# real multi-resolution icon set instead of a single resized copy;
+# desktop environments then pick whichever size fits (menu, taskbar,
+# alt-tab, ...) instead of scaling one image up or down.
+for size in 16 32 48 64 128 256 512; do
+  theme_dir="$appdir/usr/share/icons/hicolor/${size}x${size}/apps"
+  mkdir -p "$theme_dir"
+  cp "$repo_root/img/icon/${size}.png" "$theme_dir/vcdplayer.png"
+done
 
 tools_dir="$workdir/tools"
 mkdir -p "$tools_dir"
@@ -45,7 +54,7 @@ PATH="$tools_dir:$PATH" "$tools_dir/linuxdeploy" \
   --appdir "$appdir" \
   --executable "$appdir/usr/bin/$(basename "$exe")" \
   --desktop-file "$workdir/vcdplayer.desktop" \
-  --icon-file "$workdir/vcdplayer.png" \
+  --icon-file "$repo_root/img/icon/256.png" \
   --plugin qt \
   --output appimage
 cd - >/dev/null

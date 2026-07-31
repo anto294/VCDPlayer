@@ -1,5 +1,6 @@
 #include <QApplication>
 #include <QIcon>
+#include <QSize>
 
 #include <cstdio>
 
@@ -18,6 +19,17 @@ void FlushingMessageHandler(QtMsgType, const QMessageLogContext&, const QString&
   std::fflush(stderr);
 }
 
+// Loads every pre-rendered resolution (see resources.qrc / img/icon/) into
+// one QIcon, instead of a single large image Qt would have to downscale on
+// the fly: window/taskbar/Alt-Tab each pick whichever size renders sharpest.
+QIcon AppIcon() {
+  QIcon icon;
+  for (int size : {16, 32, 48, 64, 128, 256, 512}) {
+    icon.addFile(QStringLiteral(":/icons/icon-%1.png").arg(size), QSize(size, size));
+  }
+  return icon;
+}
+
 }  // namespace
 
 int main(int argc, char** argv) {
@@ -26,7 +38,7 @@ int main(int argc, char** argv) {
   QApplication app(argc, argv);
   app.setApplicationName("VCD Player");
   app.setOrganizationName("VCD Player");
-  app.setWindowIcon(QIcon(QStringLiteral(":/icons/icon.png")));
+  app.setWindowIcon(AppIcon());
 
   MainWindow window;
   window.show();

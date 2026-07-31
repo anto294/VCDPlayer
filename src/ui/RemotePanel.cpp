@@ -20,6 +20,12 @@ QPushButton* makeButton(const QString& text, const QString& tooltip = QString())
 
 RemotePanel::RemotePanel(QWidget* parent) : QWidget(parent) {
   setFixedWidth(224);
+  // A plain QWidget doesn't paint its stylesheet's background/border on its
+  // own; without this it stays see-through, which used to be invisible when
+  // the panel sat beside the video but now that it floats on top of it (see
+  // MainWindow::updateOverlayPositions()) the video would otherwise show
+  // through underneath it.
+  setAttribute(Qt::WA_StyledBackground, true);
   setStyleSheet(
       "RemotePanel { background: #1a1c22; border: 1px solid #2a2d36; border-radius: 10px; }"
       "QPushButton { background: #262932; color: #e8e8ec; border: 1px solid #383c48;"
@@ -37,8 +43,12 @@ RemotePanel::RemotePanel(QWidget* parent) : QWidget(parent) {
   discInfoLayout->setSpacing(2);
   discTitle_ = new QLabel(tr("No disc"));
   discTitle_->setStyleSheet("font-size: 14px; font-weight: 600;");
+  discTitle_->setWordWrap(true);
   discStatus_ = new QLabel(QStringLiteral("—"));
   discStatus_->setStyleSheet("font-size: 12px; color: #8a8d98;");
+  // Status strings like "Menu — 9 choices (use the number keys)" can
+  // easily be wider than the panel; wrap instead of getting clipped.
+  discStatus_->setWordWrap(true);
   discInfoLayout->addWidget(discTitle_);
   discInfoLayout->addWidget(discStatus_);
   auto* discInfoWidget = new QWidget();
@@ -77,12 +87,17 @@ RemotePanel::RemotePanel(QWidget* parent) : QWidget(parent) {
   // --- Numeric keypad ----------------------------------------------
   auto* numpad = new QGridLayout();
   numpad->setSpacing(6);
-  for (int i = 0; i < 10; i++) {
-    const int digit = (i + 1) % 10;  // 1..9,0 order
+  for (int digit = 1; digit <= 9; digit++) {
     auto* btn = makeButton(QString::number(digit));
-    numpad->addWidget(btn, i / 3, i % 3);
+    const int index = digit - 1;
+    numpad->addWidget(btn, index / 3, index % 3);
     connect(btn, &QPushButton::clicked, this, [this, digit]() { emit numberPressed(digit); });
   }
+  // 0 goes under 8 (row 3, column 1), like a phone/calculator keypad,
+  // instead of lining up under the 1/4/7 column.
+  auto* zeroButton = makeButton(QStringLiteral("0"));
+  numpad->addWidget(zeroButton, 3, 1);
+  connect(zeroButton, &QPushButton::clicked, this, [this]() { emit numberPressed(0); });
   mainLayout->addLayout(numpad);
 
   mainLayout->addStretch(1);
@@ -112,22 +127,6 @@ RemotePanel::RemotePanel(QWidget* parent) : QWidget(parent) {
   connect(muteButton_, &QPushButton::clicked, this, &RemotePanel::muteToggled);
   connect(volumeSlider_, &QSlider::valueChanged, this, &RemotePanel::volumeChanged);
 
-  auto* zoomRow = new QHBoxLayout();
-  auto* zoomOutButton = makeButton(QStringLiteral("Zoom −"), QStringLiteral("Zoom -"));
-  auto* zoomResetButton = makeButton(QStringLiteral("100%"), tr("Reset zoom"));
-  auto* zoomInButton = makeButton(QStringLiteral("Zoom +"), QStringLiteral("Zoom +"));
-  zoomRow->addWidget(zoomOutButton);
-  zoomRow->addWidget(zoomResetButton);
-  zoomRow->addWidget(zoomInButton);
-  mainLayout->addLayout(zoomRow);
-  connect(zoomOutButton, &QPushButton::clicked, this, &RemotePanel::zoomOutRequested);
-  connect(zoomResetButton, &QPushButton::clicked, this, &RemotePanel::zoomResetRequested);
-  connect(zoomInButton, &QPushButton::clicked, this, &RemotePanel::zoomInRequested);
-
-  screenshotButton_ = makeButton(QStringLiteral("\U0001F4F7 ") + tr("Take screenshot"));
-  mainLayout->addWidget(screenshotButton_);
-  connect(screenshotButton_, &QPushButton::clicked, this, &RemotePanel::screenshotRequested);
-
   fullscreenButton_ = makeButton(QStringLiteral("⛶ ") + tr("Fullscreen"));
   mainLayout->addWidget(fullscreenButton_);
   connect(fullscreenButton_, &QPushButton::clicked, this, &RemotePanel::fullscreenToggled);
@@ -156,7 +155,6 @@ void RemotePanel::retranslateUi() {
   pauseButton_->setText(tr("Pause"));
   stopButton_->setText(tr("Stop"));
   muteButton_->setToolTip(muted_ ? tr("Unmute") : tr("Mute"));
-  screenshotButton_->setText(QStringLiteral("\U0001F4F7 ") + tr("Take screenshot"));
   fullscreenButton_->setText(QStringLiteral("⛶ ") + tr("Fullscreen"));
 }
 

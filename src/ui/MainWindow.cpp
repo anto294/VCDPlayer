@@ -8,10 +8,12 @@
 #include <QContextMenuEvent>
 #include <QCoreApplication>
 #include <QDebug>
+#include <QDesktopServices>
 #include <QDir>
 #include <QDragEnterEvent>
 #include <QDropEvent>
 #include <QFileDialog>
+#include <QFileInfo>
 #include <QKeyEvent>
 #include <QLabel>
 #include <QMenu>
@@ -38,11 +40,44 @@
 namespace {
 
 constexpr int kSeekBarMax = 1000;
+constexpr int kWindowMargin = 24;
+constexpr int kLayoutSpacing = 10;
+constexpr int kPanelWidth = 224;  // must match RemotePanel::setFixedWidth()
+constexpr int kToggleRailWidth = 36;  // permanent slot for panelToggleButton_, see updateOverlayPositions()
 
 QString formatTime(double seconds) {
   const int s = static_cast<int>(std::max(0.0, std::floor(seconds)));
   return QStringLiteral("%1:%2").arg(s / 60, 2, 10, QChar('0')).arg(s % 60, 2, 10, QChar('0'));
 }
+
+// Keeps a single child locked to a 4:3 box, centered within whatever space
+// the layout gives this container. video_ used to simply fill its layout
+// cell, with mpv pillarboxing/letterboxing the picture *inside* that
+// (arbitrarily-shaped) black-bordered rect; wrapping it in this box instead
+// moves that shaping to the Qt widget itself, so the visible frame always
+// matches the VCD picture's own 4:3 shape rather than floating inside a
+// bigger box.
+class AspectRatioBox : public QWidget {
+ public:
+  AspectRatioBox(QWidget* content, QWidget* parent) : QWidget(parent), content_(content) {
+    content_->setParent(this);
+  }
+
+ protected:
+  void resizeEvent(QResizeEvent*) override {
+    constexpr double kAspect = 4.0 / 3.0;
+    int targetW = width();
+    int targetH = static_cast<int>(std::round(targetW / kAspect));
+    if (targetH > height()) {
+      targetH = height();
+      targetW = static_cast<int>(std::round(targetH * kAspect));
+    }
+    content_->setGeometry((width() - targetW) / 2, (height() - targetH) / 2, targetW, targetH);
+  }
+
+ private:
+  QWidget* content_;
+};
 
 }  // namespace
 
@@ -62,9 +97,9 @@ MainWindow::MainWindow(QWidget* parent) : QMainWindow(parent) {
     }
   }
 
-  setWindowTitle(QStringLiteral("VCD Player"));
-  resize(1150, 880);
-  setMinimumSize(760, 800);
+  updateWindowTitle();
+  resize(1155, 700);
+  setMinimumSize(760, 520);
   setAcceptDrops(true);
 
   player_ = new MpvPlayer(this);
@@ -77,19 +112,30 @@ MainWindow::MainWindow(QWidget* parent) : QMainWindow(parent) {
 
   auto* central = new QWidget(this);
   setCentralWidget(central);
+  // Video and panel sit side by side, never overlapping — the video always
+  // gets every pixel not spoken for by the panel or its toggle button.
+  // toggleRailSpacer_ reserves a slot for panelToggleButton_ between the
+  // video and the panel while the panel is open; it's hidden along with the
+  // panel when collapsed (see setRemoteVisible()) so the video reclaims that
+  // width instead of leaving it as dead space. Window margins are equal on
+  // both sides, so with no rail reserved the video area is symmetric on its
+  // own — and mpv always centers the actual (4:3) picture within whatever
+  // rect video_ ends up with — so the picture stays centered too, without
+  // needing a separate balancing widget.
   auto* rootLayout = new QHBoxLayout(central);
-  rootLayout->setContentsMargins(24, 24, 24, 24);
-  rootLayout->setSpacing(10);
+  rootLayout->setContentsMargins(kWindowMargin, kWindowMargin, kWindowMargin, kWindowMargin);
+  rootLayout->setSpacing(kLayoutSpacing);
 
   auto* mainArea = new QWidget(central);
   auto* mainAreaLayout = new QVBoxLayout(mainArea);
   mainAreaLayout->setContentsMargins(0, 0, 0, 0);
   mainAreaLayout->setSpacing(10);
 
-  video_ = new VideoWidget(player_, mainArea);
-  video_->setMinimumSize(160, 120);
+  video_ = new VideoWidget(player_);
   video_->setStyleSheet("background: #000; border: 1px solid #2a2d36; border-radius: 4px;");
-  mainAreaLayout->addWidget(video_, 1);
+  auto* videoBox = new AspectRatioBox(video_, mainArea);
+  videoBox->setMinimumSize(160, 120);  // 4:3, matches AspectRatioBox's own ratio
+  mainAreaLayout->addWidget(videoBox, 1);
 
   progressRow_ = new QWidget(mainArea);
   auto* progressLayout = new QHBoxLayout(progressRow_);
@@ -108,15 +154,26 @@ MainWindow::MainWindow(QWidget* parent) : QMainWindow(parent) {
 
   rootLayout->addWidget(mainArea, 1);
 
+  toggleRailSpacer_ = new QWidget(central);
+  toggleRailSpacer_->setFixedWidth(kToggleRailWidth);
+  toggleRailSpacer_->setAttribute(Qt::WA_TransparentForMouseEvents);
+  rootLayout->addWidget(toggleRailSpacer_, 0);
+
   remote_ = new RemotePanel(central);
+  remote_->setFixedWidth(kPanelWidth);
   rootLayout->addWidget(remote_, 0);
 
   panelToggleButton_ = new QPushButton(central);
-  panelToggleButton_->setFixedSize(18, 36);
+  panelToggleButton_->setFixedSize(28, 51);
+  panelToggleButton_->setCursor(Qt::PointingHandCursor);
+  // Floats on top of toggleRailSpacer_'s reserved slot while the panel is
+  // open, or hugs the window's right margin once it's collapsed (see
+  // updateOverlayPositions()), so it reads as its own control rather than a
+  // tab fused flush onto either side.
   panelToggleButton_->setStyleSheet(
-      "QPushButton { background: #262932; color: #e8e8ec; border: 1px solid #383c48;"
-      "  border-radius: 6px 0 0 6px; font-size: 12px; padding: 0; }"
-      "QPushButton:hover { background: #313543; }");
+      "QPushButton { background: #262932; color: #e8e8ec; border: 1px solid #43485a;"
+      "  border-radius: 10px; font-size: 14px; font-weight: 600; padding: 0; }"
+      "QPushButton:hover { background: #313543; border-color: #5a6178; }");
   panelToggleButton_->raise();
 
   buildMenuBar();
@@ -134,10 +191,6 @@ MainWindow::MainWindow(QWidget* parent) : QMainWindow(parent) {
   connect(remote_, &RemotePanel::muteToggled, this, &MainWindow::toggleMute);
   connect(remote_, &RemotePanel::volumeChanged, this,
           [this](int value) { player_->setPropertyDouble("volume", value); });
-  connect(remote_, &RemotePanel::zoomInRequested, this, [this]() { applyZoom(ZoomDirection::In); });
-  connect(remote_, &RemotePanel::zoomOutRequested, this, [this]() { applyZoom(ZoomDirection::Out); });
-  connect(remote_, &RemotePanel::zoomResetRequested, this, [this]() { applyZoom(ZoomDirection::Reset); });
-  connect(remote_, &RemotePanel::screenshotRequested, this, &MainWindow::takeScreenshot);
   connect(remote_, &RemotePanel::fullscreenToggled, this, &MainWindow::toggleFullscreen);
 
   connect(seekBar_, &QSlider::sliderMoved, this, [this](int value) {
@@ -210,10 +263,6 @@ void MainWindow::buildMenuBar() {
   QAction* menuAction = playbackMenu->addAction(tr("Disc menu"));
   menuAction->setShortcut(QKeySequence(QStringLiteral("Ctrl+Alt+Up")));
   connect(menuAction, &QAction::triggered, this, [this]() { sendRemoteButton(vcd::RemoteButton::Return); });
-  playbackMenu->addSeparator();
-  QAction* screenshotAction = playbackMenu->addAction(tr("Take screenshot"));
-  screenshotAction->setShortcut(QKeySequence(QStringLiteral("Ctrl+S")));
-  connect(screenshotAction, &QAction::triggered, this, &MainWindow::takeScreenshot);
 
   auto* audioMenu = menuBar()->addMenu(tr("&Audio"));
   QAction* volUpAction = audioMenu->addAction(tr("Volume up"));
@@ -228,12 +277,17 @@ void MainWindow::buildMenuBar() {
     const double v = std::max(0.0, player_->getProperty("volume").toDouble() - 5);
     player_->setPropertyDouble("volume", v);
   });
+  audioMenu->addSeparator();
   muteAction_ = audioMenu->addAction(tr("Mute"));
   muteAction_->setCheckable(true);
   muteAction_->setShortcut(QKeySequence(QStringLiteral("M")));
   connect(muteAction_, &QAction::triggered, this, &MainWindow::toggleMute);
 
   auto* viewMenu = menuBar()->addMenu(tr("&View"));
+  QAction* screenshotAction = viewMenu->addAction(tr("Take screenshot"));
+  screenshotAction->setShortcut(QKeySequence(QStringLiteral("Ctrl+S")));
+  connect(screenshotAction, &QAction::triggered, this, &MainWindow::takeScreenshot);
+  viewMenu->addSeparator();
   fullscreenAction_ = viewMenu->addAction(tr("Fullscreen"));
   fullscreenAction_->setCheckable(true);
   fullscreenAction_->setShortcut(QKeySequence(Qt::Key_F11));
@@ -278,6 +332,10 @@ void MainWindow::buildMenuBar() {
   italianAction->setChecked(currentLanguage_ == QStringLiteral("it"));
   languageGroup->addAction(italianAction);
   connect(italianAction, &QAction::triggered, this, [this]() { setLanguage(QStringLiteral("it")); });
+
+  auto* infoMenu = menuBar()->addMenu(tr("&Info"));
+  QAction* aboutAction = infoMenu->addAction(tr("About VCD Player"));
+  connect(aboutAction, &QAction::triggered, this, &MainWindow::showAboutDialog);
 }
 
 QMenu* MainWindow::buildContextMenu() {
@@ -299,7 +357,6 @@ QMenu* MainWindow::buildContextMenu() {
           [this]() { sendRemoteButton(vcd::RemoteButton::Prev); });
   connect(menu->addAction(tr("Disc menu")), &QAction::triggered, this,
           [this]() { sendRemoteButton(vcd::RemoteButton::Return); });
-  connect(menu->addAction(tr("Take screenshot")), &QAction::triggered, this, &MainWindow::takeScreenshot);
   menu->addSeparator();
 
   auto* audioMenu = menu->addMenu(tr("Audio"));
@@ -311,10 +368,14 @@ QMenu* MainWindow::buildContextMenu() {
     const double v = std::max(0.0, player_->getProperty("volume").toDouble() - 5);
     player_->setPropertyDouble("volume", v);
   });
+  audioMenu->addSeparator();
   QAction* muteItem = audioMenu->addAction(tr("Mute"));
   muteItem->setCheckable(true);
   muteItem->setChecked(player_->getProperty("mute").toBool());
   connect(muteItem, &QAction::triggered, this, &MainWindow::toggleMute);
+  menu->addSeparator();
+
+  connect(menu->addAction(tr("Take screenshot")), &QAction::triggered, this, &MainWindow::takeScreenshot);
   menu->addSeparator();
 
   QAction* fsItem = menu->addAction(tr("Fullscreen"));
@@ -370,10 +431,14 @@ void MainWindow::openDiscDialog() {
 void MainWindow::openDiscPath(const QString& cuePath) {
   remote_->setStatus(tr("Loading…"));
   QString error;
-  if (!session_->openDiscPath(cuePath, &error)) {
+  if (session_->openDiscPath(cuePath, &error)) {
+    currentDiscFileName_ = QFileInfo(cuePath).fileName();
+  } else {
+    currentDiscFileName_.clear();
     remote_->setStatus(QStringLiteral("—"));
     QMessageBox::critical(this, tr("Error opening disc"), error);
   }
+  updateWindowTitle();
 }
 
 void MainWindow::sendRemoteButton(vcd::RemoteButton btn, int number) { session_->sendRemoteButton(btn, number); }
@@ -401,7 +466,7 @@ void MainWindow::toggleFullscreen() {
   }
   menuBar()->setVisible(!goingFullscreen);
   panelToggleButton_->setVisible(!goingFullscreen);
-  remote_->setVisible(!goingFullscreen && showRemote_);
+  setRemoteVisible(!goingFullscreen && showRemote_);
   progressRow_->setVisible(!goingFullscreen && (showProgressBarSetting_ || showTimeLabelSetting_));
   if (fullscreenAction_) fullscreenAction_->setChecked(goingFullscreen);
 }
@@ -440,6 +505,23 @@ void MainWindow::takeScreenshot() {
   player_->command({"screenshot"});
   const QString dir = QStandardPaths::writableLocation(QStandardPaths::PicturesLocation) + "/VCDPlayer";
   statusBar()->showMessage(tr("Screenshot saved to %1").arg(dir), 3000);
+}
+
+void MainWindow::showAboutDialog() {
+  QMessageBox box(this);
+  box.setWindowTitle(tr("About VCD Player"));
+  box.setIconPixmap(windowIcon().pixmap(64, 64));
+  box.setTextFormat(Qt::RichText);
+  box.setText(tr("<h3>VCD Player</h3>"
+                 "<p>A native Video CD player with full PBC (Playback Control) menu support.</p>"
+                 "<p>Built with Qt %1 and libmpv.</p>")
+                  .arg(QString::fromLatin1(QT_VERSION_STR)));
+  QPushButton* reportButton = box.addButton(tr("Report an issue"), QMessageBox::ActionRole);
+  box.addButton(QMessageBox::Ok);
+  box.exec();
+  if (box.clickedButton() == reportButton) {
+    QDesktopServices::openUrl(QUrl(QStringLiteral("https://github.com/anto294/VCDPlayer/issues")));
+  }
 }
 
 void MainWindow::setLanguage(const QString& languageCode) {
@@ -481,30 +563,60 @@ void MainWindow::retranslateUi() {
   showRemoteAction_->setChecked(showRemote_);
 
   remote_->retranslateUi();
+  updateWindowTitle();
 }
 
 void MainWindow::applyViewSettingsToUi() {
   if (!isFullScreen()) {
-    remote_->setVisible(showRemote_);
+    setRemoteVisible(showRemote_);
     progressRow_->setVisible(showProgressBarSetting_ || showTimeLabelSetting_);
   }
   seekBar_->setVisible(showProgressBarSetting_);
   timeCurrentLabel_->setVisible(showTimeLabelSetting_);
   timeDurationLabel_->setVisible(showTimeLabelSetting_);
   panelToggleButton_->setText(showRemote_ ? QStringLiteral("›") : QStringLiteral("‹"));
-  updatePanelTogglePosition();
+  updateOverlayPositions();
 }
 
-void MainWindow::updatePanelTogglePosition() {
+void MainWindow::setRemoteVisible(bool visible) {
+  remote_->setVisible(visible);
+  toggleRailSpacer_->setVisible(visible);
+}
+
+void MainWindow::updateOverlayPositions() {
   auto* central = centralWidget();
   if (!central) return;
-  const int w = panelToggleButton_->width();
-  const int h = panelToggleButton_->height();
-  const int rightGap = showRemote_ ? 235 : 2;
-  const int x = central->width() - rightGap - w;
-  const int y = central->height() / 2 - h / 2;
-  panelToggleButton_->setGeometry(x, y, w, h);
+
+  // panelToggleButton_ isn't layout-managed (it has to stay clickable even
+  // while the panel it controls is hidden), so its position is derived from
+  // the same constants that drive rootLayout instead of the panel's actual
+  // geometry — cheaper than forcing a layout activation and just as exact.
+  const int btnW = panelToggleButton_->width();
+  const int btnH = panelToggleButton_->height();
+  int btnX;
+  if (showRemote_) {
+    // Centered within toggleRailSpacer_'s reserved slot between video and panel.
+    const int railX = central->width() - kWindowMargin - kPanelWidth - kLayoutSpacing - kToggleRailWidth;
+    btnX = railX + (kToggleRailWidth - btnW) / 2;
+  } else {
+    // No rail reserved — the video reclaims that width — so the button just
+    // hugs the window's right margin, only lightly overlapping the video's
+    // own edge (it doesn't fit inside the margin alone), instead of sitting
+    // deep inside it like before.
+    btnX = central->width() - btnW - kWindowMargin / 4;
+  }
+  // Vertically centered on the video's row: mainArea spans the same height
+  // as central here (the toggle rail/panel columns beside it don't add
+  // margins of their own), so central's own vertical center lines up with
+  // it, progress row or not.
+  const int btnY = central->height() / 2 - btnH / 2;
+  panelToggleButton_->setGeometry(btnX, btnY, btnW, btnH);
   panelToggleButton_->raise();
+}
+
+void MainWindow::updateWindowTitle() {
+  const QString suffix = currentDiscFileName_.isEmpty() ? tr("No disc") : currentDiscFileName_;
+  setWindowTitle(QStringLiteral("VCD Player - %1").arg(suffix));
 }
 
 void MainWindow::onMpvPropertyChanged(const QString& name, const QVariant& value) {
@@ -530,11 +642,16 @@ void MainWindow::onMpvPropertyChanged(const QString& name, const QVariant& value
 
 void MainWindow::resizeEvent(QResizeEvent* event) {
   QMainWindow::resizeEvent(event);
-  updatePanelTogglePosition();
+  updateOverlayPositions();
 }
 
 void MainWindow::keyPressEvent(QKeyEvent* event) {
-  const bool noModifier = event->modifiers() == Qt::NoModifier;
+  // Qt reports numeric-keypad keys with Qt::KeypadModifier set even though
+  // they're otherwise plain digit/arrow/+−keys (e.g. Numpad "5" is Key_5 +
+  // KeypadModifier): masking it out of the comparison is what makes the
+  // keypad work as a second set of remote-control keys, not just the keys
+  // above the letters.
+  const bool noModifier = (event->modifiers() & ~Qt::KeypadModifier) == Qt::NoModifier;
   if (noModifier && event->key() >= Qt::Key_0 && event->key() <= Qt::Key_9) {
     sendRemoteButton(vcd::RemoteButton::Number, event->key() - Qt::Key_0);
     return;

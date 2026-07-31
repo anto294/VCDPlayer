@@ -4,6 +4,10 @@
 <context>
     <name>MainWindow</name>
     <message>
+        <source>No disc</source>
+        <translation>Nessun disco</translation>
+    </message>
+    <message>
         <source>Disc</source>
         <translation>Disco</translation>
     </message>
@@ -155,6 +159,22 @@
         <source>Screenshot saved to %1</source>
         <translation>Schermata catturata in %1</translation>
     </message>
+    <message>
+        <source>&amp;Info</source>
+        <translation>&amp;Info</translation>
+    </message>
+    <message>
+        <source>About VCD Player</source>
+        <translation>Informazioni su VCD Player</translation>
+    </message>
+    <message>
+        <source>&lt;h3&gt;VCD Player&lt;/h3&gt;&lt;p&gt;A native Video CD player with full PBC (Playback Control) menu support.&lt;/p&gt;&lt;p&gt;Built with Qt %1 and libmpv.&lt;/p&gt;</source>
+        <translation>&lt;h3&gt;VCD Player&lt;/h3&gt;&lt;p&gt;Un lettore Video CD nativo con supporto completo ai menu PBC (Playback Control).&lt;/p&gt;&lt;p&gt;Realizzato con Qt %1 e libmpv.&lt;/p&gt;</translation>
+    </message>
+    <message>
+        <source>Report an issue</source>
+        <translation>Segnala un problema</translation>
+    </message>
 </context>
 <context>
     <name>RemotePanel</name>
@@ -193,14 +213,6 @@
     <message>
         <source>Unmute</source>
         <translation>Attiva audio</translation>
-    </message>
-    <message>
-        <source>Reset zoom</source>
-        <translation>Reimposta zoom</translation>
-    </message>
-    <message>
-        <source>Take screenshot</source>
-        <translation>Cattura schermata</translation>
     </message>
     <message>
         <source>Fullscreen</source>

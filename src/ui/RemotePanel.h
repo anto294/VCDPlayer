@@ -9,9 +9,12 @@ class QPushButton;
 class QSlider;
 
 // Collapsible remote panel: dpad, numeric keypad, transport controls,
-// volume/mute, zoom, screenshot, fullscreen. Contains no playback logic:
-// it emits signals that MainWindow forwards to DiscSession/MpvPlayer, and
-// receives state updates through its public set*() methods.
+// volume/mute, fullscreen. Zoom and screenshot are deliberately not
+// duplicated here — they stay in the menu bar/context menu (with keyboard
+// shortcuts), keeping this panel focused on disc navigation. Contains no
+// playback logic: it emits signals that MainWindow forwards to
+// DiscSession/MpvPlayer, and receives state updates through its public
+// set*() methods.
 class RemotePanel : public QWidget {
   Q_OBJECT
 
@@ -33,10 +36,6 @@ class RemotePanel : public QWidget {
   void numberPressed(int digit);
   void muteToggled();
   void volumeChanged(int value);
-  void zoomInRequested();
-  void zoomOutRequested();
-  void zoomResetRequested();
-  void screenshotRequested();
   void fullscreenToggled();
 
  private:
@@ -50,7 +49,6 @@ class RemotePanel : public QWidget {
   QPushButton* stopButton_;
   QPushButton* muteButton_;
   QSlider* volumeSlider_;
-  QPushButton* screenshotButton_;
   QPushButton* fullscreenButton_;
 
   bool hasDisc_ = false;

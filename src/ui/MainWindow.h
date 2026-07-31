@@ -61,6 +61,7 @@ class MainWindow : public QMainWindow {
   void setShowProgressBar(bool show);
   void setShowTimeLabel(bool show);
   void takeScreenshot();
+  void showAboutDialog();
 
   // Switches the active UI language ("en"/"it"), persists the choice, and
   // rebuilds every translatable widget in place — no restart required.
@@ -68,13 +69,16 @@ class MainWindow : public QMainWindow {
   void retranslateUi();
 
   void applyViewSettingsToUi();
-  void updatePanelTogglePosition();
+  void setRemoteVisible(bool visible);
+  void updateOverlayPositions();
+  void updateWindowTitle();
   void onMpvPropertyChanged(const QString& name, const QVariant& value);
 
   MpvPlayer* player_;
   DiscSession* session_;
   VideoWidget* video_;
   RemotePanel* remote_;
+  QWidget* toggleRailSpacer_;  // slot for panelToggleButton_ between video and panel; hidden when panel is collapsed so the video reclaims that width
   QWidget* progressRow_;
   QSlider* seekBar_;
   QLabel* timeCurrentLabel_;
@@ -93,6 +97,7 @@ class MainWindow : public QMainWindow {
   bool showTimeLabelSetting_ = false;
 
   QString currentDiscTitle_;
+  QString currentDiscFileName_;  // basename of the opened .cue, for the window title
   double lastDuration_ = 0.0;
   bool seekDragging_ = false;
 
