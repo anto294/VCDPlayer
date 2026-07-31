@@ -1,7 +1,10 @@
 # VCD Player
 
-A cross-platform (Windows, Linux, macOS) desktop player for Video CDs (VCD),
-built with Qt6 and [libmpv](https://mpv.io/).
+A cross-platform desktop player for Video CDs (VCD), built with Qt6 and
+[libmpv](https://mpv.io/). Windows and Linux are built and tested in CI
+(see [Prebuilt builds](#prebuilt-builds)); macOS should work (Qt6 + mpv are
+both available via Homebrew and the CMake setup doesn't assume a specific
+OS) but is untested and not part of CI.
 
 It reads a disc directly from its `.cue`/`.bin` image: parses the ISO9660
 filesystem and PBC (PlayBack Control) metadata, resolves every video track
@@ -24,8 +27,8 @@ alongside a plain sequential-playback fallback for discs without PBC.
 
 - CMake >= 3.20, a C++17 compiler
 - [Qt6](https://www.qt.io/) (`Widgets` + `LinguistTools` components)
-- libmpv (see below — a system package on Linux/macOS, a local source build
-  on Windows)
+- libmpv (see below — a system/MSYS2 package on Linux/macOS/Windows, or a
+  local source build as a fallback)
 
 ### Getting libmpv
 
@@ -39,14 +42,24 @@ sudo apt install libmpv-dev
 sudo dnf install mpv-libs-devel
 # Arch
 sudo pacman -S mpv
-# macOS
+# macOS (untested, see note above)
 brew install mpv
 ```
 
-**Windows**: there's no equivalent system package, so this repo builds mpv
-from source instead. Clone it into `vendor/mpv-src` and build `libmpv` with
-[meson](https://mesonbuild.com/), following mpv's own [Windows compilation
-guide](https://github.com/mpv-player/mpv/blob/master/DOCS/compile-windows.md):
+**Windows**: the tested setup (same as CI) is [MSYS2](https://www.msys2.org/),
+which packages mpv for both MINGW64 (x64) and CLANGARM64 (arm64) with a
+`pkg-config` file, so CMake finds it the same way it does on Linux/macOS:
+
+```sh
+# from an MSYS2 MINGW64 or CLANGARM64 shell
+pacman -S mingw-w64-x86_64-mpv mingw-w64-x86_64-pkgconf   # MINGW64 (x64)
+pacman -S mingw-w64-clang-aarch64-mpv mingw-w64-clang-aarch64-pkgconf  # CLANGARM64 (arm64)
+```
+
+If you're building with plain MSVC instead (no MSYS2/pkg-config available),
+CMake falls back to a vendored source build. Clone mpv into `vendor/mpv-src`
+and build `libmpv` with [meson](https://mesonbuild.com/), following mpv's own
+[Windows compilation guide](https://github.com/mpv-player/mpv/blob/master/DOCS/compile-windows.md):
 
 ```sh
 git clone https://github.com/mpv-player/mpv vendor/mpv-src
@@ -55,11 +68,11 @@ meson setup build
 meson compile -C build
 ```
 
-CMake falls back to this vendored build (`vendor/mpv-src/include` +
+CMake uses this vendored build (`vendor/mpv-src/include` +
 `vendor/mpv-src/build/libmpv.dll.a`) whenever `pkg-config` can't find a
-system libmpv — so it also works as a Linux/macOS fallback if you need a
-specific mpv build instead of the distro's. `libmpv-2.dll` is copied next to
-the built executable automatically in that case.
+system libmpv — so it's also a fallback on Linux/macOS if you need a specific
+mpv build instead of the distro's. `libmpv-2.dll` is copied next to the built
+executable automatically in that case.
 
 > **Licensing note:** mpv defaults to a GPLv2+ build (`meson setup
 > -Dgpl=true`, the default; most distro packages ship this too). Because VCD
@@ -74,6 +87,12 @@ the built executable automatically in that case.
 cmake -S . -B build -DCMAKE_PREFIX_PATH=<path-to-your-Qt6-kit>
 cmake --build build
 ```
+
+## Prebuilt builds
+
+Every push builds portable Windows (x64, arm64) archives and Linux (x86_64,
+arm64) AppImages — see the **Actions** tab for build artifacts from any run,
+or **Releases** for tagged versions.
 
 ## Test samples
 

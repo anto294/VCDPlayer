@@ -42,10 +42,11 @@ target_link_libraries(VCDPlayer PRIVATE Qt6::Widgets)
 # libmpv lookup:
 # - Linux/macOS: a system libmpv (distro package, Homebrew, ...) is the
 #   normal way to get it, and it's discoverable via pkg-config.
-# - Windows has no such convention, so a source checkout + local meson
-#   build under vendor/mpv-src is used instead (see README.md). The same
-#   vendored build is used as a fallback on any platform where pkg-config
-#   can't find a system libmpv.
+# - Windows: MSYS2 packages mpv with a pkg-config file too (see README.md),
+#   so this also covers a MINGW64/CLANGARM64 shell. Plain MSVC has no
+#   pkg-config, so it falls back to a source checkout + local meson build
+#   under vendor/mpv-src instead — also the fallback on any platform where
+#   pkg-config can't find a system libmpv.
 find_package(PkgConfig QUIET)
 if(PkgConfig_FOUND)
     pkg_check_modules(MPV QUIET mpv)
