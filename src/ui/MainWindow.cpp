@@ -99,10 +99,23 @@ MainWindow::MainWindow(QWidget* parent) : QMainWindow(parent) {
 
   updateWindowTitle();
   resize(1155, 700);
-  setMinimumSize(760, 520);
+  setMinimumSize(1155, 700);
   setAcceptDrops(true);
 
+  renderBackendSetting_ = QSettings().value(QStringLiteral("renderBackend"), QStringLiteral("auto")).toString();
+
   player_ = new MpvPlayer(this);
+  // "Automatic" is resolved once here, at startup, rather than re-probed
+  // every launch inside MpvPlayer itself — keeps the (GL-context-creating)
+  // detection probe next to the rest of the Advanced-settings UI instead of
+  // buried in the render backend it's picking between.
+  MpvPlayer::RenderBackend backend = MpvPlayer::RenderBackend::Software;
+  if (renderBackendSetting_ == QStringLiteral("hardware")) {
+    backend = MpvPlayer::RenderBackend::OpenGL;
+  } else if (renderBackendSetting_ == QStringLiteral("auto")) {
+    backend = MpvPlayer::detectBestRenderBackend();
+  }
+  player_->setPreferredRenderBackend(backend);
   session_ = new DiscSession(player_, this);
 
   const QString screenshotDir =
@@ -333,6 +346,29 @@ void MainWindow::buildMenuBar() {
   languageGroup->addAction(italianAction);
   connect(italianAction, &QAction::triggered, this, [this]() { setLanguage(QStringLiteral("it")); });
 
+  auto* advancedMenu = menuBar()->addMenu(tr("&Advanced"));
+  auto* renderingMenu = advancedMenu->addMenu(tr("Rendering"));
+  auto* renderingGroup = new QActionGroup(renderingMenu);
+  renderingGroup->setExclusive(true);
+  QAction* renderAutoAction = renderingMenu->addAction(tr("Automatic (recommended)"));
+  renderAutoAction->setCheckable(true);
+  renderAutoAction->setChecked(renderBackendSetting_ == QStringLiteral("auto"));
+  renderingGroup->addAction(renderAutoAction);
+  connect(renderAutoAction, &QAction::triggered, this,
+          [this]() { setRenderBackendSetting(QStringLiteral("auto")); });
+  QAction* renderSwAction = renderingMenu->addAction(tr("Software"));
+  renderSwAction->setCheckable(true);
+  renderSwAction->setChecked(renderBackendSetting_ == QStringLiteral("software"));
+  renderingGroup->addAction(renderSwAction);
+  connect(renderSwAction, &QAction::triggered, this,
+          [this]() { setRenderBackendSetting(QStringLiteral("software")); });
+  QAction* renderHwAction = renderingMenu->addAction(tr("Hardware (GPU)"));
+  renderHwAction->setCheckable(true);
+  renderHwAction->setChecked(renderBackendSetting_ == QStringLiteral("hardware"));
+  renderingGroup->addAction(renderHwAction);
+  connect(renderHwAction, &QAction::triggered, this,
+          [this]() { setRenderBackendSetting(QStringLiteral("hardware")); });
+
   auto* infoMenu = menuBar()->addMenu(tr("&Info"));
   QAction* aboutAction = infoMenu->addAction(tr("About VCD Player"));
   connect(aboutAction, &QAction::triggered, this, &MainWindow::showAboutDialog);
@@ -522,6 +558,14 @@ void MainWindow::showAboutDialog() {
   if (box.clickedButton() == reportButton) {
     QDesktopServices::openUrl(QUrl(QStringLiteral("https://github.com/anto294/VCDPlayer/issues")));
   }
+}
+
+void MainWindow::setRenderBackendSetting(const QString& value) {
+  if (value == renderBackendSetting_) return;
+  renderBackendSetting_ = value;
+  QSettings().setValue(QStringLiteral("renderBackend"), value);
+  QMessageBox::information(this, tr("Restart required"),
+                            tr("The new rendering setting will take effect the next time VCD Player starts."));
 }
 
 void MainWindow::setLanguage(const QString& languageCode) {

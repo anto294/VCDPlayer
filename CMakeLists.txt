@@ -8,7 +8,7 @@ set(CMAKE_AUTOMOC ON)
 set(CMAKE_AUTORCC ON)
 set(CMAKE_AUTOUIC ON)
 
-find_package(Qt6 REQUIRED COMPONENTS Widgets LinguistTools)
+find_package(Qt6 REQUIRED COMPONENTS Widgets OpenGL LinguistTools)
 
 # App icon: resources.rc gives the .exe itself a native Windows icon (shown
 # in Explorer/taskbar/shortcuts); resources.qrc embeds the same artwork as a
@@ -37,7 +37,7 @@ add_executable(VCDPlayer WIN32
     ${APP_ICON_RESOURCE}
 )
 
-target_link_libraries(VCDPlayer PRIVATE Qt6::Widgets)
+target_link_libraries(VCDPlayer PRIVATE Qt6::Widgets Qt6::OpenGL)
 
 # libmpv lookup:
 # - Linux/macOS: a system libmpv (distro package, Homebrew, ...) is the

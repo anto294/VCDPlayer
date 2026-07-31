@@ -10,19 +10,40 @@
 #include <QStringList>
 #include <QVariant>
 
+class QOpenGLContext;
+class QOffscreenSurface;
+class QOpenGLFramebufferObject;
+
 // Wrapper around libmpv: creates the client handle and the render context
-// (libmpv render API, software backend — see MpvPlayer.cpp for why),
-// pumps mpv events into the Qt loop, and forwards commands. Replaces the
-// JSON-over-pipe IPC used in the Electron version — here everything runs
-// in-process, no external mpv.exe.
+// (libmpv render API — software or OpenGL, see initRenderContext() for how
+// the two differ and detectBestRenderBackend() for how one gets picked by
+// default), pumps mpv events into the Qt loop, and forwards commands.
+// Replaces the JSON-over-pipe IPC used in the Electron version — here
+// everything runs in-process, no external mpv.exe.
 class MpvPlayer : public QObject {
   Q_OBJECT
 
  public:
+  enum class RenderBackend { Software, OpenGL };
+
   explicit MpvPlayer(QObject* parent = nullptr);
   ~MpvPlayer() override;
 
   mpv_handle* handle() const { return mpv_; }
+
+  // Must be called before initRenderContext() to have any effect (the
+  // Advanced settings menu's "Rendering" choice, resolved from "Automatic"
+  // to a concrete backend beforehand if needed — see MainWindow). Defaults
+  // to Software if never called.
+  void setPreferredRenderBackend(RenderBackend backend) { backend_ = backend; }
+  RenderBackend renderBackend() const { return backend_; }
+
+  // Creates a real (offscreen, throwaway) OpenGL context just to read back
+  // GL_RENDERER and see whether it names a known software rasterizer —
+  // used to resolve "Automatic" without ever letting mpv's own GL renderer
+  // touch a driver known to mishandle it (see initRenderContext()).
+  // Returns Software if no GL context could be created at all.
+  static RenderBackend detectBestRenderBackend();
 
   void initRenderContext();
   bool hasRenderContext() const { return renderCtx_ != nullptr; }
@@ -54,6 +75,21 @@ class MpvPlayer : public QObject {
 
   void processMpvEvents();
 
+  bool initSoftwareRenderContext();
+  bool initOpenGlRenderContext();
+  void renderSoftware(void* pixels, int width, int height, size_t stride);
+  void renderOpenGl(void* pixels, int width, int height, size_t stride);
+
   mpv_handle* mpv_ = nullptr;
   mpv_render_context* renderCtx_ = nullptr;
+  RenderBackend backend_ = RenderBackend::Software;
+
+  // Only used for RenderBackend::OpenGL: an offscreen context/surface mpv
+  // renders into, read back into the same CPU pixel buffer the software
+  // backend fills directly, so VideoWidget's paint path (QImage + QPainter)
+  // stays identical either way — the difference is entirely in how the
+  // frame gets decoded/scaled/color-converted before it lands there.
+  QOpenGLContext* glContext_ = nullptr;
+  QOffscreenSurface* glSurface_ = nullptr;
+  QOpenGLFramebufferObject* glFbo_ = nullptr;
 };

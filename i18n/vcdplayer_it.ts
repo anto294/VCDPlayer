@@ -175,6 +175,34 @@
         <source>Report an issue</source>
         <translation>Segnala un problema</translation>
     </message>
+    <message>
+        <source>&amp;Advanced</source>
+        <translation>&amp;Avanzate</translation>
+    </message>
+    <message>
+        <source>Rendering</source>
+        <translation>Rendering</translation>
+    </message>
+    <message>
+        <source>Automatic (recommended)</source>
+        <translation>Automatico (consigliato)</translation>
+    </message>
+    <message>
+        <source>Software</source>
+        <translation>Software</translation>
+    </message>
+    <message>
+        <source>Hardware (GPU)</source>
+        <translation>Hardware (GPU)</translation>
+    </message>
+    <message>
+        <source>Restart required</source>
+        <translation>Riavvio necessario</translation>
+    </message>
+    <message>
+        <source>The new rendering setting will take effect the next time VCD Player starts.</source>
+        <translation>La nuova impostazione di rendering avrà effetto al prossimo avvio di VCD Player.</translation>
+    </message>
 </context>
 <context>
     <name>RemotePanel</name>

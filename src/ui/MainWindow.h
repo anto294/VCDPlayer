@@ -63,6 +63,12 @@ class MainWindow : public QMainWindow {
   void takeScreenshot();
   void showAboutDialog();
 
+  // "auto"/"software"/"hardware", persisted and applied on next launch —
+  // switching the render backend live mid-session isn't worth the risk
+  // (see MpvPlayer::initRenderContext()), so this just saves the choice and
+  // tells the user to restart.
+  void setRenderBackendSetting(const QString& value);
+
   // Switches the active UI language ("en"/"it"), persists the choice, and
   // rebuilds every translatable widget in place — no restart required.
   void setLanguage(const QString& languageCode);
@@ -103,4 +109,6 @@ class MainWindow : public QMainWindow {
 
   QString currentLanguage_ = QStringLiteral("en");
   QTranslator* translator_ = nullptr;
+
+  QString renderBackendSetting_ = QStringLiteral("auto");
 };

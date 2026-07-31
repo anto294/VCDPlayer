@@ -1,10 +1,39 @@
 #include "MpvPlayer.h"
 
+#include <mpv/render_gl.h>
+
 #include <QMetaObject>
+#include <QOffscreenSurface>
+#include <QOpenGLContext>
+#include <QOpenGLFramebufferObject>
+#include <QOpenGLFunctions>
+#include <QSurfaceFormat>
 #include <QVector>
 #include <stdexcept>
 
 namespace {
+
+// Software GL rasterizers report themselves through GL_RENDERER just like
+// real GPUs do, but reproduce a real artifact in mpv's GL shader pipeline
+// (see MpvPlayer::initOpenGlRenderContext()) — not something a proc-address
+// probe can detect on its own, so detectBestRenderBackend() instead refuses
+// the OpenGL backend outright whenever the renderer string names one of
+// these, and only ever recommends it where genuine GPU rendering is likely.
+bool IsKnownSoftwareRenderer(const QString& glRenderer) {
+  static const QStringList kNeedles = {
+      QStringLiteral("llvmpipe"),
+      QStringLiteral("softpipe"),
+      QStringLiteral("swiftshader"),
+      QStringLiteral("microsoft basic render driver"),
+      QStringLiteral("d3d12 (microsoft basic render driver)"),
+      QStringLiteral("mesa dozen"),
+  };
+  const QString lower = glRenderer.toLower();
+  for (const QString& needle : kNeedles) {
+    if (lower.contains(needle)) return true;
+  }
+  return false;
+}
 
 QVariant MpvNodeToQVariant(mpv_node* node) {
   switch (node->format) {
@@ -54,36 +83,115 @@ MpvPlayer::MpvPlayer(QObject* parent) : QObject(parent) {
 MpvPlayer::~MpvPlayer() {
   if (renderCtx_) mpv_render_context_free(renderCtx_);
   if (mpv_) mpv_terminate_destroy(mpv_);
+  // The GL objects must go before the context that created them; making the
+  // context current one last time is what makes that destruction valid.
+  if (glContext_ && glSurface_) glContext_->makeCurrent(glSurface_);
+  delete glFbo_;
+  delete glContext_;
+  delete glSurface_;
+}
+
+MpvPlayer::RenderBackend MpvPlayer::detectBestRenderBackend() {
+  QOffscreenSurface surface;
+  surface.create();
+  if (!surface.isValid()) return RenderBackend::Software;
+
+  QOpenGLContext probe;
+  if (!probe.create() || !probe.makeCurrent(&surface)) return RenderBackend::Software;
+
+  const auto* renderer = reinterpret_cast<const char*>(probe.functions()->glGetString(GL_RENDERER));
+  const QString rendererName = renderer ? QString::fromUtf8(renderer) : QString();
+  probe.doneCurrent();
+
+  if (rendererName.isEmpty() || IsKnownSoftwareRenderer(rendererName)) return RenderBackend::Software;
+  return RenderBackend::OpenGL;
 }
 
 void MpvPlayer::initRenderContext() {
   if (renderCtx_) return;
 
-  // Software render API backend (MPV_RENDER_API_TYPE_SW) instead of OpenGL:
-  // on this machine (no real GPU, rendering via Mesa llvmpipe) mpv's
-  // classic OpenGL shader path produced a real grid artifact on the video,
-  // reproduced identically under any combination of
-  // scaling/dithering/FBO-format options — a bug in mpv's GPU renderer on
-  // this software driver, not in the content (verified by decoding/scaling
-  // the same stream with plain ffmpeg, no OpenGL involved: no artifact).
-  // The SW backend instead draws directly into a pixel buffer in RAM,
-  // never touching OpenGL/Mesa — it bypasses that whole class of graphics
-  // driver bugs, behaves identically everywhere, and for a VCD source
-  // (352x288) the CPU cost is negligible. No GPU/GL context required: can
-  // be created right away.
-  mpv_render_param params[] = {
-      {MPV_RENDER_PARAM_API_TYPE, const_cast<char*>(MPV_RENDER_API_TYPE_SW)},
-      {MPV_RENDER_PARAM_INVALID, nullptr},
-  };
-  const int rc = mpv_render_context_create(&renderCtx_, mpv_, params);
-  if (rc < 0)
-    throw std::runtime_error(QString("mpv_render_context_create() failed: %1").arg(mpv_error_string(rc)).toStdString());
+  // Two render API backends, chosen by whoever calls
+  // setPreferredRenderBackend() before this (MainWindow, from the Advanced
+  // settings menu / detectBestRenderBackend() for "Automatic"):
+  //  - Software (MPV_RENDER_API_TYPE_SW): draws directly into a pixel
+  //    buffer in RAM, never touching a GPU driver. Needed on machines
+  //    without a real GPU — this project's own dev sandbox renders via
+  //    Mesa llvmpipe, where mpv's classic OpenGL shader path produced a
+  //    real grid artifact on the video, reproduced identically under any
+  //    combination of scaling/dithering/FBO-format options (verified as a
+  //    bug in mpv's GPU renderer on that software driver, not the content,
+  //    by decoding/scaling the same stream with plain ffmpeg — no OpenGL
+  //    involved, no artifact). Also the safe fallback if OpenGL init below
+  //    fails for any other reason.
+  //  - OpenGL: lets mpv decode/scale/color-convert on the GPU, which is
+  //    both faster and avoids that CPU path entirely on real hardware.
+  // Either way the frame ends up in the same CPU pixel buffer (see
+  // renderSoftware()/renderOpenGl()), so VideoWidget's own paint path never
+  // needs to know which backend is active.
+  bool ok = false;
+  if (backend_ == RenderBackend::OpenGL) {
+    ok = initOpenGlRenderContext();
+    if (!ok) backend_ = RenderBackend::Software;  // fall back rather than leave video blank
+  }
+  if (!ok) ok = initSoftwareRenderContext();
+
+  if (!ok) throw std::runtime_error("mpv_render_context_create() failed for both OpenGL and software backends.");
 
   mpv_render_context_set_update_callback(renderCtx_, &MpvPlayer::OnMpvRenderUpdate, this);
 }
 
+bool MpvPlayer::initSoftwareRenderContext() {
+  mpv_render_param params[] = {
+      {MPV_RENDER_PARAM_API_TYPE, const_cast<char*>(MPV_RENDER_API_TYPE_SW)},
+      {MPV_RENDER_PARAM_INVALID, nullptr},
+  };
+  backend_ = RenderBackend::Software;
+  return mpv_render_context_create(&renderCtx_, mpv_, params) >= 0;
+}
+
+bool MpvPlayer::initOpenGlRenderContext() {
+  glSurface_ = new QOffscreenSurface();
+  glSurface_->create();
+  if (!glSurface_->isValid()) return false;
+
+  glContext_ = new QOpenGLContext();
+  if (!glContext_->create() || !glContext_->makeCurrent(glSurface_)) return false;
+
+  mpv_opengl_init_params glInitParams = {
+      [](void*, const char* name) -> void* {
+        // Only ever called while glContext_ is current (during
+        // mpv_render_context_create() below), so the thread-local
+        // QOpenGLContext::currentContext() is guaranteed to be it.
+        return reinterpret_cast<void*>(QOpenGLContext::currentContext()->getProcAddress(name));
+      },
+      nullptr,
+  };
+  // Deliberately not setting MPV_RENDER_PARAM_ADVANCED_CONTROL: it requires
+  // implementing mpv_render_context_update()'s full contract (calling
+  // report_swap() etc.), which an earlier attempt at this got wrong,
+  // silently breaking the redraw signal after the first frame. "Simple"
+  // mode (the default, unset) works fine without it.
+  mpv_render_param params[] = {
+      {MPV_RENDER_PARAM_API_TYPE, const_cast<char*>(MPV_RENDER_API_TYPE_OPENGL)},
+      {MPV_RENDER_PARAM_OPENGL_INIT_PARAMS, &glInitParams},
+      {MPV_RENDER_PARAM_INVALID, nullptr},
+  };
+  backend_ = RenderBackend::OpenGL;
+  const bool ok = mpv_render_context_create(&renderCtx_, mpv_, params) >= 0;
+  glContext_->doneCurrent();
+  return ok;
+}
+
 void MpvPlayer::render(void* pixels, int width, int height, size_t stride) {
   if (!renderCtx_) return;
+  if (backend_ == RenderBackend::OpenGL) {
+    renderOpenGl(pixels, width, height, stride);
+  } else {
+    renderSoftware(pixels, width, height, stride);
+  }
+}
+
+void MpvPlayer::renderSoftware(void* pixels, int width, int height, size_t stride) {
   int size[2] = {width, height};
   char format[] = "bgr0";  // QImage::Format_RGB32's in-memory layout (little-endian)
   mpv_render_param params[] = {
@@ -94,6 +202,42 @@ void MpvPlayer::render(void* pixels, int width, int height, size_t stride) {
       {MPV_RENDER_PARAM_INVALID, nullptr},
   };
   mpv_render_context_render(renderCtx_, params);
+}
+
+void MpvPlayer::renderOpenGl(void* pixels, int width, int height, size_t stride) {
+  glContext_->makeCurrent(glSurface_);
+
+  if (!glFbo_ || glFbo_->size() != QSize(width, height)) {
+    delete glFbo_;
+    glFbo_ = new QOpenGLFramebufferObject(width, height);
+  }
+
+  mpv_opengl_fbo fbo{};
+  fbo.fbo = static_cast<int>(glFbo_->handle());
+  fbo.w = width;
+  fbo.h = height;
+  // FLIP_Y=1 makes mpv render top-down into the FBO; combined with
+  // glReadPixels' own bottom-up convention below, the two flips cancel out
+  // and pixels lands right-side up without an extra copy/mirror pass.
+  int flipY = 1;
+  mpv_render_param params[] = {
+      {MPV_RENDER_PARAM_OPENGL_FBO, &fbo},
+      {MPV_RENDER_PARAM_FLIP_Y, &flipY},
+      {MPV_RENDER_PARAM_INVALID, nullptr},
+  };
+  mpv_render_context_render(renderCtx_, params);
+
+  auto* gl = glContext_->functions();
+  gl->glBindFramebuffer(GL_FRAMEBUFFER, glFbo_->handle());
+  gl->glFinish();
+  // Row length in `pixels` (from stride) always equals width * 4 for
+  // QImage::Format_RGB32 (each pixel is already 4-byte aligned), which is
+  // exactly glReadPixels' own tightly-packed default — no glPixelStorei
+  // needed. GL_BGRA + GL_UNSIGNED_BYTE matches "bgr0"'s byte order.
+  gl->glReadPixels(0, 0, width, height, GL_BGRA, GL_UNSIGNED_BYTE, pixels);
+  Q_UNUSED(stride);
+
+  glContext_->doneCurrent();
 }
 
 int MpvPlayer::command(const QStringList& args) {
