@@ -3,7 +3,7 @@
 # self-contained, portable folder: every non-system DLL it depends on
 # (transitively) plus the Qt platform plugin, since neither ships in a
 # default Windows install. Must run inside the MSYS2 shell that built the
-# exe (relies on $MSYSTEM_PREFIX and its `ldd`).
+# exe (relies on $MSYSTEM_PREFIX and its `objdump`).
 set -euo pipefail
 
 exe="$1"       # path to the built executable, e.g. build/VCDPlayer.exe
@@ -16,8 +16,12 @@ rm -rf dist
 mkdir -p "$dist_dir"
 cp "$exe" "$dist_dir/"
 
-collect_deps() {
-  ldd "$1" 2>/dev/null | awk '{print $3}' | grep -i "^${prefix}/" || true
+# Deliberately not `ldd`: MSYS2's ldd resolves a native (non-MSYS) PE
+# executable's imports by actually running it, which for a Qt6 GUI app
+# means it launches the app and blocks on its event loop instead of
+# returning. `objdump -p` reads the PE import table statically instead.
+direct_deps() {
+  objdump -p "$1" 2>/dev/null | awk '/DLL Name:/ { print $3 }'
 }
 
 declare -A seen
@@ -25,11 +29,12 @@ queue=("$dist_dir/$(basename "$exe")")
 while [ "${#queue[@]}" -gt 0 ]; do
   bin="${queue[0]}"
   queue=("${queue[@]:1}")
-  for dep in $(collect_deps "$bin"); do
-    name="$(basename "$dep")"
+  for name in $(direct_deps "$bin"); do
+    src="$prefix/bin/$name"
+    [ -f "$src" ] || continue  # a Windows/system DLL, not ours to bundle
     if [ -z "${seen[$name]+x}" ]; then
       seen[$name]=1
-      cp -n "$dep" "$dist_dir/"
+      cp -n "$src" "$dist_dir/"
       queue+=("$dist_dir/$name")
     fi
   done
