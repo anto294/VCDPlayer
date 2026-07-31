@@ -1,4 +1,5 @@
 #include <QApplication>
+#include <QIcon>
 
 #include <cstdio>
 
@@ -25,6 +26,7 @@ int main(int argc, char** argv) {
   QApplication app(argc, argv);
   app.setApplicationName("VCD Player");
   app.setOrganizationName("VCD Player");
+  app.setWindowIcon(QIcon(QStringLiteral(":/icons/icon.png")));
 
   MainWindow window;
   window.show();

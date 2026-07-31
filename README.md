@@ -1,6 +1,7 @@
 # VCD Player
 
-A Windows desktop player for Video CDs (VCD), built with Qt6 and [libmpv](https://mpv.io/).
+A cross-platform (Windows, Linux, macOS) desktop player for Video CDs (VCD),
+built with Qt6 and [libmpv](https://mpv.io/).
 
 It reads a disc directly from its `.cue`/`.bin` image: parses the ISO9660
 filesystem and PBC (PlayBack Control) metadata, resolves every video track
@@ -21,16 +22,31 @@ alongside a plain sequential-playback fallback for discs without PBC.
 
 ### Prerequisites
 
-- Windows, CMake >= 3.20, a C++17 compiler (MSVC or MinGW matching your Qt kit)
+- CMake >= 3.20, a C++17 compiler
 - [Qt6](https://www.qt.io/) (`Widgets` + `LinguistTools` components)
-- [mpv source tree](https://github.com/mpv-player/mpv) with a built `libmpv`,
-  see below
+- libmpv (see below — a system package on Linux/macOS, a local source build
+  on Windows)
 
 ### Getting libmpv
 
-This repo does not vendor mpv's source. Clone it into `vendor/mpv-src` and
-build `libmpv` with [meson](https://mesonbuild.com/), following mpv's own
-[Windows compilation guide](https://github.com/mpv-player/mpv/blob/master/DOCS/compile-windows.md):
+**Linux / macOS**: install the mpv development package from your package
+manager; CMake finds it automatically via `pkg-config`.
+
+```sh
+# Debian/Ubuntu
+sudo apt install libmpv-dev
+# Fedora
+sudo dnf install mpv-libs-devel
+# Arch
+sudo pacman -S mpv
+# macOS
+brew install mpv
+```
+
+**Windows**: there's no equivalent system package, so this repo builds mpv
+from source instead. Clone it into `vendor/mpv-src` and build `libmpv` with
+[meson](https://mesonbuild.com/), following mpv's own [Windows compilation
+guide](https://github.com/mpv-player/mpv/blob/master/DOCS/compile-windows.md):
 
 ```sh
 git clone https://github.com/mpv-player/mpv vendor/mpv-src
@@ -39,16 +55,18 @@ meson setup build
 meson compile -C build
 ```
 
-The project expects `vendor/mpv-src/include` (headers) and
-`vendor/mpv-src/build/libmpv.dll.a` + `libmpv-2.dll` (import lib and runtime
-DLL) to exist after this step; `libmpv-2.dll` is copied next to the built
-executable automatically.
+CMake falls back to this vendored build (`vendor/mpv-src/include` +
+`vendor/mpv-src/build/libmpv.dll.a`) whenever `pkg-config` can't find a
+system libmpv — so it also works as a Linux/macOS fallback if you need a
+specific mpv build instead of the distro's. `libmpv-2.dll` is copied next to
+the built executable automatically in that case.
 
 > **Licensing note:** mpv defaults to a GPLv2+ build (`meson setup
-> -Dgpl=true`, the default). Because VCD Player links against it, the
-> combined binary is a GPLv2+/GPLv3 work — this is why VCD Player itself is
-> licensed GPLv3 (see [LICENSE](LICENSE)). If you need a differently
-> licensed build, reconfigure mpv with `-Dgpl=false` (LGPLv2.1+) instead.
+> -Dgpl=true`, the default; most distro packages ship this too). Because VCD
+> Player links against it, the combined binary is a GPLv2+/GPLv3 work — this
+> is why VCD Player itself is licensed GPLv3 (see [LICENSE](LICENSE)). If you
+> need a differently licensed build, reconfigure mpv with `-Dgpl=false`
+> (LGPLv2.1+) instead.
 
 ### Building VCD Player
 
