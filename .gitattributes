@@ -1,0 +1,4 @@
+# Shell scripts always run through MSYS2/Linux bash: CRLF breaks their
+# shebang and any heredoc (a "\r" after the closing marker stops bash from
+# recognizing it), regardless of core.autocrlf on a contributor's machine.
+*.sh text eol=lf
