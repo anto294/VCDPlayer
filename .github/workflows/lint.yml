@@ -32,9 +32,7 @@ jobs:
         run: pip install clang-format==22.1.8
 
       - name: Check formatting
-        run: |
-          files=$(find src -name '*.cpp' -o -name '*.h')
-          clang-format --dry-run --Werror $files
+        run: find src \( -name '*.cpp' -o -name '*.h' \) -exec clang-format --dry-run --Werror {} +
 
   tidy:
     name: clang-tidy
@@ -66,9 +64,7 @@ jobs:
         run: cmake -S . -B build -G Ninja -DCMAKE_EXPORT_COMPILE_COMMANDS=ON
 
       - name: Run clang-tidy
-        run: |
-          files=$(find src -name '*.cpp')
-          clang-tidy -p build --warnings-as-errors='*' $files
+        run: find src -name '*.cpp' -exec clang-tidy -p build --warnings-as-errors='*' {} +
 
   actionlint:
     name: actionlint
