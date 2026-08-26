@@ -20,7 +20,14 @@ alongside a plain sequential-playback fallback for discs without PBC.
 - Native `.cue`/`.bin` VCD image loading (no mounting/extraction required)
 - Full PBC (PlayBack Control) menu navigation
 - Collapsible remote-control panel: d-pad, numeric keypad, transport
-  controls, volume/mute, zoom, screenshot, fullscreen
+  controls, volume/mute, fullscreen
+- Zoom, screenshot, always-on-top, and progress bar/time label toggles
+  (menu bar and right-click context menu)
+- Two mpv render backends — Software (safe default, works everywhere) and
+  Hardware/OpenGL (GPU-accelerated) — picked automatically or set manually
+  under **Advanced > Rendering**
+- Experimental GPU (Anime4K) and CPU upscaling for VCD's low native
+  resolution (352x288), under the **Experimental** menu
 - Open via drag & drop, "Open with", or command line (`VCDPlayer.exe path\to\disc.cue`)
 - Italian and English UI (Qt Linguist `.ts`/`.qm`)
 
@@ -29,7 +36,7 @@ alongside a plain sequential-playback fallback for discs without PBC.
 ### Prerequisites
 
 - CMake >= 3.20, a C++17 compiler
-- [Qt6](https://www.qt.io/) (`Widgets` + `LinguistTools` components)
+- [Qt6](https://www.qt.io/) (`Widgets`, `OpenGL`, `LinguistTools` components)
 - libmpv (see below — a system/MSYS2 package on Linux/macOS/Windows, or a
   local source build as a fallback)
 
