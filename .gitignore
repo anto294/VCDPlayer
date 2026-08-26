@@ -1,4 +1,6 @@
 build/
+build-*/
+.ccache*/
 vendor/mpv-src/
 samples/
 *.log

@@ -21,21 +21,45 @@ concurrency:
 permissions:
   contents: read
 
+env:
+  CCACHE_DIR: ${{ github.workspace }}/.ccache
+  CCACHE_MAXSIZE: 200M
+
 jobs:
+  # arm64 only builds on push/tag/dispatch, not on every PR: it's the same
+  # source as the x64/x86_64 leg, so a PR gets fast feedback from one arch per
+  # OS and the second only spends runner time once the change actually
+  # merges. Computed once here (rather than an `if:` per matrix entry, which
+  # can't see `matrix.*` at the job level) so the skipped jobs show as
+  # skipped instead of running a step-by-step no-op.
+  matrix-config:
+    name: Compute build matrix
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    outputs:
+      windows: ${{ steps.set.outputs.windows }}
+      linux: ${{ steps.set.outputs.linux }}
+    steps:
+      - id: set
+        run: |
+          windows='[{"arch":"x64","msystem":"MINGW64","os":"windows-2025"}]'
+          linux='[{"arch":"x86_64","appimage_arch":"x86_64","os":"ubuntu-24.04"}]'
+          if [ "${{ github.event_name }}" != "pull_request" ]; then
+            windows='[{"arch":"x64","msystem":"MINGW64","os":"windows-2025"},{"arch":"arm64","msystem":"CLANGARM64","os":"windows-11-arm"}]'
+            linux='[{"arch":"x86_64","appimage_arch":"x86_64","os":"ubuntu-24.04"},{"arch":"arm64","appimage_arch":"aarch64","os":"ubuntu-24.04-arm"}]'
+          fi
+          echo "windows=$windows" >> "$GITHUB_OUTPUT"
+          echo "linux=$linux" >> "$GITHUB_OUTPUT"
+
   windows:
     name: Windows (${{ matrix.arch }})
+    needs: matrix-config
     runs-on: ${{ matrix.os }}
     timeout-minutes: 30
     strategy:
       fail-fast: false
       matrix:
-        include:
-          - arch: x64
-            msystem: MINGW64
-            os: windows-latest
-          - arch: arm64
-            msystem: CLANGARM64
-            os: windows-11-arm
+        include: ${{ fromJson(needs.matrix-config.outputs.windows) }}
     defaults:
       run:
         shell: msys2 {0}
@@ -56,12 +80,27 @@ jobs:
             qt6-base:p
             qt6-tools:p
             mpv:p
+            ccache:p
+
+      - name: Cache ccache
+        uses: actions/cache@v6
+        with:
+          path: ${{ env.CCACHE_DIR }}
+          key: ccache-windows-${{ matrix.arch }}-${{ github.run_id }}
+          restore-keys: |
+            ccache-windows-${{ matrix.arch }}-
 
       - name: Configure
-        run: cmake -S . -B build -G Ninja -DCMAKE_BUILD_TYPE=Release
+        run: >-
+          cmake -S . -B build -G Ninja -DCMAKE_BUILD_TYPE=Release
+          -DCMAKE_C_COMPILER_LAUNCHER=ccache
+          -DCMAKE_CXX_COMPILER_LAUNCHER=ccache
 
       - name: Build
         run: cmake --build build
+
+      - name: ccache stats
+        run: ccache -s
 
       - name: Package portable build
         run: |
@@ -75,18 +114,17 @@ jobs:
 
   linux-appimage:
     name: Linux AppImage (${{ matrix.arch }})
+    needs: matrix-config
     runs-on: ${{ matrix.os }}
     timeout-minutes: 20
     strategy:
       fail-fast: false
       matrix:
-        include:
-          - arch: x86_64
-            appimage_arch: x86_64
-            os: ubuntu-24.04
-          - arch: arm64
-            appimage_arch: aarch64
-            os: ubuntu-24.04-arm
+        include: ${{ fromJson(needs.matrix-config.outputs.linux) }}
+    env:
+      # Persisted below via actions/cache so linuxdeploy/linuxdeploy-plugin-qt
+      # (100+ MB each) aren't re-downloaded from GitHub on every run.
+      LINUXDEPLOY_CACHE_DIR: ${{ github.workspace }}/.linuxdeploy-tools
     steps:
       - uses: actions/checkout@v7
 
@@ -94,15 +132,44 @@ jobs:
         run: |
           sudo apt-get update
           sudo apt-get install -y \
-            build-essential cmake ninja-build pkg-config \
+            build-essential cmake ninja-build pkg-config ccache \
             qt6-base-dev qt6-tools-dev qt6-l10n-tools libmpv-dev \
             fuse libfuse2 desktop-file-utils
 
+      - name: Cache ccache
+        uses: actions/cache@v6
+        with:
+          path: ${{ env.CCACHE_DIR }}
+          key: ccache-linux-${{ matrix.arch }}-${{ github.run_id }}
+          restore-keys: |
+            ccache-linux-${{ matrix.arch }}-
+
+      - name: Get ISO week
+        id: week
+        run: echo "value=$(date -u +%G-W%V)" >> "$GITHUB_OUTPUT"
+
+      - name: Cache linuxdeploy tools
+        uses: actions/cache@v6
+        with:
+          path: ${{ env.LINUXDEPLOY_CACHE_DIR }}
+          # linuxdeploy/linuxdeploy-plugin-qt ship from a rolling "continuous"
+          # release, so the key rotates weekly instead of being fixed forever
+          # — trades a little re-downloading for not going stale.
+          key: linuxdeploy-${{ matrix.appimage_arch }}-${{ steps.week.outputs.value }}
+          restore-keys: |
+            linuxdeploy-${{ matrix.appimage_arch }}-
+
       - name: Configure
-        run: cmake -S . -B build -G Ninja -DCMAKE_BUILD_TYPE=Release
+        run: >-
+          cmake -S . -B build -G Ninja -DCMAKE_BUILD_TYPE=Release
+          -DCMAKE_C_COMPILER_LAUNCHER=ccache
+          -DCMAKE_CXX_COMPILER_LAUNCHER=ccache
 
       - name: Build
         run: cmake --build build
+
+      - name: ccache stats
+        run: ccache -s
 
       - name: Package AppImage
         run: |
@@ -113,6 +180,41 @@ jobs:
           name: VCDPlayer-linux-${{ matrix.arch }}-appimage
           path: dist/*.AppImage
           if-no-files-found: error
+
+  macos:
+    # Build-only sanity check, not part of the release: README says macOS
+    # "should work but is untested" since Qt6 + mpv are both available via
+    # Homebrew and CMakeLists.txt makes no Windows/Linux-only assumptions —
+    # this job is what actually backs that claim instead of just asserting it.
+    name: macOS (build only)
+    runs-on: macos-14
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Install dependencies
+        run: brew install qt cmake ninja pkg-config mpv ccache
+
+      - name: Cache ccache
+        uses: actions/cache@v6
+        with:
+          path: ${{ env.CCACHE_DIR }}
+          key: ccache-macos-${{ github.run_id }}
+          restore-keys: |
+            ccache-macos-
+
+      - name: Configure
+        run: >-
+          cmake -S . -B build -G Ninja -DCMAKE_BUILD_TYPE=Release
+          -DCMAKE_PREFIX_PATH="$(brew --prefix qt)"
+          -DCMAKE_C_COMPILER_LAUNCHER=ccache
+          -DCMAKE_CXX_COMPILER_LAUNCHER=ccache
+
+      - name: Build
+        run: cmake --build build
+
+      - name: ccache stats
+        run: ccache -s
 
   release:
     name: Publish draft release
