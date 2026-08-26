@@ -119,3 +119,6 @@ clang-tidy -p build src/**/*.cpp   # needs a build/ configured with
 
 GPLv3 or later — see [LICENSE](LICENSE). This choice follows from linking
 against mpv's default GPLv2+ build; see the licensing note above.
+
+Bundles the Anime4K "Upscale (M)" GLSL shader (MIT, bloc97) — see
+[shaders/README.md](shaders/README.md).
