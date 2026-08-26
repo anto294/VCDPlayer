@@ -56,9 +56,7 @@ int64_t SizeCb(void* cookieRaw) {
   return c->totalBytes;
 }
 
-void CloseCb(void* cookieRaw) {
-  delete static_cast<StreamCookie*>(cookieRaw);
-}
+void CloseCb(void* cookieRaw) { delete static_cast<StreamCookie*>(cookieRaw); }
 
 int OpenCb(void* userData, char* uri, mpv_stream_cb_info* info) {
   auto* registry = static_cast<VcdStreamRegistry*>(userData);
@@ -103,9 +101,7 @@ std::string VcdStreamRegistry::registerStream(std::string binPath, int64_t lba, 
   return "vcdxa://" + std::to_string(id);
 }
 
-void VcdStreamRegistry::installOn(mpv_handle* mpv) {
-  mpv_stream_cb_add_ro(mpv, "vcdxa", this, OpenCb);
-}
+void VcdStreamRegistry::installOn(mpv_handle* mpv) { mpv_stream_cb_add_ro(mpv, "vcdxa", this, OpenCb); }
 
 const VcdStreamRegistry::StreamDef* VcdStreamRegistry::find(int id) const {
   if (id < 0 || static_cast<size_t>(id) >= streams_.size()) return nullptr;

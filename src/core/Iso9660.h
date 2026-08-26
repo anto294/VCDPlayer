@@ -37,6 +37,6 @@ std::vector<DirEntry> listDirectory(CdxaReader& reader, int64_t trackStartLba, i
 
 // Resolves a path like "VCD/INFO.VCD" (case-insensitive) starting from root.
 std::optional<DirEntry> resolvePath(CdxaReader& reader, int64_t trackStartLba, const DirRecord& root,
-                                     const std::string& relPath);
+                                    const std::string& relPath);
 
 }  // namespace vcd

@@ -112,8 +112,7 @@ RemotePanel::RemotePanel(QWidget* parent) : QWidget(parent) {
   transportRow->addWidget(stopButton_);
   mainLayout->addLayout(transportRow);
   connect(playButton_, &QPushButton::clicked, this, [this]() { emit remoteButtonPressed(vcd::RemoteButton::Play); });
-  connect(pauseButton_, &QPushButton::clicked, this,
-          [this]() { emit remoteButtonPressed(vcd::RemoteButton::Pause); });
+  connect(pauseButton_, &QPushButton::clicked, this, [this]() { emit remoteButtonPressed(vcd::RemoteButton::Pause); });
   connect(stopButton_, &QPushButton::clicked, this, [this]() { emit remoteButtonPressed(vcd::RemoteButton::Stop); });
 
   auto* volumeRow = new QHBoxLayout();

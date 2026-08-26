@@ -89,7 +89,7 @@ std::vector<DirEntry> listDirectory(CdxaReader& reader, int64_t trackStartLba, i
 }
 
 std::optional<DirEntry> resolvePath(CdxaReader& reader, int64_t trackStartLba, const DirRecord& root,
-                                     const std::string& relPath) {
+                                    const std::string& relPath) {
   std::vector<std::string> parts;
   std::istringstream iss(relPath);
   std::string part;
@@ -102,8 +102,8 @@ std::optional<DirEntry> resolvePath(CdxaReader& reader, int64_t trackStartLba, c
   for (size_t i = 0; i < parts.size(); i++) {
     const std::vector<DirEntry> entries = listDirectory(reader, trackStartLba, current.lba, current.length);
     const std::string wanted = toUpperAscii(parts[i]);
-    const auto it = std::find_if(entries.begin(), entries.end(),
-                                  [&](const DirEntry& e) { return toUpperAscii(e.name) == wanted; });
+    const auto it =
+        std::find_if(entries.begin(), entries.end(), [&](const DirEntry& e) { return toUpperAscii(e.name) == wanted; });
     if (it == entries.end()) return std::nullopt;
     if (i == parts.size() - 1) return *it;
     if (!it->isDir) return std::nullopt;

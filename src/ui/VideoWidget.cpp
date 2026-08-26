@@ -40,6 +40,4 @@ void VideoWidget::mouseDoubleClickEvent(QMouseEvent* event) {
   if (event->button() == Qt::LeftButton) emit doubleClicked();
 }
 
-void VideoWidget::contextMenuEvent(QContextMenuEvent* event) {
-  emit rightClicked(event->globalPos());
-}
+void VideoWidget::contextMenuEvent(QContextMenuEvent* event) { emit rightClicked(event->globalPos()); }

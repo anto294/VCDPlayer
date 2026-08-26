@@ -34,14 +34,14 @@ bool DiscSession::openDiscPath(const QString& cuePath, QString* errorMessage) {
   pbc_.reset();
   disc_ = std::move(loaded);
 
-  pbc_ = std::make_unique<vcd::PbcEngine>(disc_->info, disc_->entriesFile, disc_->lot, disc_->psd,
-                                           disc_->trackStreams, disc_->segmentStreams, this, this);
+  pbc_ = std::make_unique<vcd::PbcEngine>(disc_->info, disc_->entriesFile, disc_->lot, disc_->psd, disc_->trackStreams,
+                                          disc_->segmentStreams, this, this);
   pbc_->onStateChanged = [this](const vcd::PbcEngine::State& s) {
     emit stateChanged(static_cast<int>(s.kind), s.choiceCount);
   };
 
   emit discLoaded(QString::fromStdString(disc_->volumeId), disc_->info.pbcEnabled,
-                   static_cast<int>(disc_->entriesFile.entries.size()));
+                  static_cast<int>(disc_->entriesFile.entries.size()));
   pbc_->start();
   return true;
 }

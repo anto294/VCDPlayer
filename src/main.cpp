@@ -1,7 +1,6 @@
 #include <QApplication>
 #include <QIcon>
 #include <QSize>
-
 #include <cstdio>
 
 #include "ui/MainWindow.h"

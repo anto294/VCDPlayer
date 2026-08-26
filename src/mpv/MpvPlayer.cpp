@@ -195,10 +195,28 @@ void MpvPlayer::renderSoftware(void* pixels, int width, int height, size_t strid
   int size[2] = {width, height};
   char format[] = "bgr0";  // QImage::Format_RGB32's in-memory layout (little-endian)
   mpv_render_param params[] = {
-      {MPV_RENDER_PARAM_SW_SIZE, size},
-      {MPV_RENDER_PARAM_SW_FORMAT, format},
-      {MPV_RENDER_PARAM_SW_STRIDE, &stride},
-      {MPV_RENDER_PARAM_SW_POINTER, pixels},
+      {MPV_RENDER_PARAM_SW_SIZE, size},      {MPV_RENDER_PARAM_SW_FORMAT, format},
+      {MPV_RENDER_PARAM_SW_STRIDE, &stride}, {MPV_RENDER_PARAM_SW_POINTER, pixels},
+      {MPV_RENDER_PARAM_INVALID, nullptr},
+  };
+  mpv_render_context_render(renderCtx_, params);
+}
+
+void MpvPlayer::refreshSoftwareScaler() {
+  if (backend_ != RenderBackend::Software || !renderCtx_) return;
+  // A throwaway 1x1 render, never painted anywhere: its only purpose is to
+  // make the next real-size render() call look, from libmpv_sw.c's point of
+  // view, like the target size just changed (1x1 -> the widget's actual
+  // size), which is what makes it reinitialize its scaler — and pick up
+  // sws-ls/sws-cs et al. along with it — instead of reusing the one it
+  // built the first time these options were whatever they were before.
+  char scratch[4] = {0};
+  int size[2] = {1, 1};
+  size_t stride = 4;
+  char format[] = "bgr0";
+  mpv_render_param params[] = {
+      {MPV_RENDER_PARAM_SW_SIZE, size},      {MPV_RENDER_PARAM_SW_FORMAT, format},
+      {MPV_RENDER_PARAM_SW_STRIDE, &stride}, {MPV_RENDER_PARAM_SW_POINTER, scratch},
       {MPV_RENDER_PARAM_INVALID, nullptr},
   };
   mpv_render_context_render(renderCtx_, params);
@@ -288,14 +306,12 @@ void MpvPlayer::observeProperty(const QString& name, mpv_format format) {
 void MpvPlayer::OnMpvEvent(void* ctx) {
   auto* self = static_cast<MpvPlayer*>(ctx);
   // Called from mpv's internal thread: defers processing to the Qt thread.
-  QMetaObject::invokeMethod(
-      self, [self]() { self->processMpvEvents(); }, Qt::QueuedConnection);
+  QMetaObject::invokeMethod(self, [self]() { self->processMpvEvents(); }, Qt::QueuedConnection);
 }
 
 void MpvPlayer::OnMpvRenderUpdate(void* ctx) {
   auto* self = static_cast<MpvPlayer*>(ctx);
-  QMetaObject::invokeMethod(
-      self, [self]() { emit self->videoRedrawNeeded(); }, Qt::QueuedConnection);
+  QMetaObject::invokeMethod(self, [self]() { emit self->videoRedrawNeeded(); }, Qt::QueuedConnection);
 }
 
 void MpvPlayer::processMpvEvents() {
@@ -304,7 +320,8 @@ void MpvPlayer::processMpvEvents() {
     if (event->event_id == MPV_EVENT_NONE) break;
     if (event->event_id == MPV_EVENT_END_FILE) {
       auto* endFileEvent = static_cast<mpv_event_end_file*>(event->data);
-      emit logMessage(QString("end-file reason=%1 error=%2").arg(endFileEvent->reason).arg(mpv_error_string(endFileEvent->error)));
+      emit logMessage(
+          QString("end-file reason=%1 error=%2").arg(endFileEvent->reason).arg(mpv_error_string(endFileEvent->error)));
       emit endFile(static_cast<int>(endFileEvent->reason));
     } else if (event->event_id == MPV_EVENT_FILE_LOADED) {
       emit fileLoaded();

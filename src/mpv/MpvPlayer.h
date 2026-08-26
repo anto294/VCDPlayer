@@ -3,12 +3,11 @@
 #include <mpv/client.h>
 #include <mpv/render.h>
 
-#include <cstddef>
-
 #include <QObject>
 #include <QString>
 #include <QStringList>
 #include <QVariant>
+#include <cstddef>
 
 class QOpenGLContext;
 class QOffscreenSurface;
@@ -51,6 +50,15 @@ class MpvPlayer : public QObject {
   // Draws the current frame into the given pixel buffer (BGR0 format, i.e.
   // QImage::Format_RGB32), called from VideoWidget::paintEvent.
   void render(void* pixels, int width, int height, size_t stride);
+
+  // Software backend only: mpv's SW render backend (video/out/libmpv_sw.c)
+  // only re-reads scaler options like sws-ls/sws-cs when it thinks the
+  // target has changed size between two render() calls — nothing makes it
+  // notice a property change on its own, unlike the GPU renderer's shader
+  // list. Call this right after changing such an option so it takes effect
+  // on the very next real frame instead of silently doing nothing until
+  // the window happens to get resized. No-op for the OpenGL backend.
+  void refreshSoftwareScaler();
 
   int command(const QStringList& args);
   void setPropertyString(const QString& name, const QString& value);

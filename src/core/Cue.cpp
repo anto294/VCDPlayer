@@ -10,9 +10,7 @@ namespace vcd {
 
 namespace fs = std::filesystem;
 
-int64_t msfToLba(int mm, int ss, int ff) {
-  return (static_cast<int64_t>(mm) * 60 + ss) * kFramesPerSecond + ff;
-}
+int64_t msfToLba(int mm, int ss, int ff) { return (static_cast<int64_t>(mm) * 60 + ss) * kFramesPerSecond + ff; }
 
 namespace {
 

@@ -8,8 +8,8 @@
 namespace vcd {
 
 constexpr int kSectorSize = 2352;
-constexpr int kSyncHeaderSize = 16;  // 12 sync + 4 header (MM:SS:FF:MODE)
-constexpr int kSubheaderSize = 8;    // subheader duplicated 2x4 bytes
+constexpr int kSyncHeaderSize = 16;                                 // 12 sync + 4 header (MM:SS:FF:MODE)
+constexpr int kSubheaderSize = 8;                                   // subheader duplicated 2x4 bytes
 constexpr int kForm1DataOffset = kSyncHeaderSize + kSubheaderSize;  // 24
 constexpr int kForm1DataSize = 2048;
 constexpr int kForm2DataSize = 2324;

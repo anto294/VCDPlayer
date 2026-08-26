@@ -25,9 +25,7 @@ CdxaReader CdxaReader::open(const std::string& binPath) {
   return CdxaReader(fp);
 }
 
-CdxaReader::CdxaReader(CdxaReader&& other) noexcept : fp_(other.fp_) {
-  other.fp_ = nullptr;
-}
+CdxaReader::CdxaReader(CdxaReader&& other) noexcept : fp_(other.fp_) { other.fp_ = nullptr; }
 
 CdxaReader& CdxaReader::operator=(CdxaReader&& other) noexcept {
   if (this != &other) {

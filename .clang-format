@@ -1,0 +1,7 @@
+--- # Matches the style already used across src/: 2-space indent, attached
+# braces, left-aligned pointers/references, includes grouped by blank lines
+# (own header / C headers / C++ std headers / Qt & project headers) and
+# sorted within each group. Google's base style already covers all of that;
+# the only real deviation here is a wider column limit.
+BasedOnStyle: Google
+ColumnLimit: 120

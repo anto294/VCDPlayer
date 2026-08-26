@@ -3,7 +3,6 @@
 #include <QObject>
 #include <QString>
 #include <QTimer>
-
 #include <functional>
 #include <memory>
 #include <optional>

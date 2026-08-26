@@ -14,8 +14,8 @@ struct LoadedDisc {
   std::string volumeId;
   VcdInfo info;
   EntriesFile entriesFile;
-  std::vector<uint8_t> lot;  // empty if PBC disabled or LOT.VCD absent
-  std::vector<uint8_t> psd;  // empty if PBC disabled or PSD.VCD absent
+  std::vector<uint8_t> lot;                 // empty if PBC disabled or LOT.VCD absent
+  std::vector<uint8_t> psd;                 // empty if PBC disabled or PSD.VCD absent
   std::map<int, StreamRef> trackStreams;    // CD track number -> Form2 stream
   std::map<int, StreamRef> segmentStreams;  // segment item number -> Form2 stream
 };

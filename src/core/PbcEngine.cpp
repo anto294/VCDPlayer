@@ -5,8 +5,8 @@
 namespace vcd {
 
 PbcEngine::PbcEngine(VcdInfo info, EntriesFile entriesFile, std::vector<uint8_t> lot, std::vector<uint8_t> psd,
-                      std::map<int, StreamRef> trackStreams, std::map<int, StreamRef> segmentStreams,
-                      IPlaybackSink* sink, ITimerHost* timerHost)
+                     std::map<int, StreamRef> trackStreams, std::map<int, StreamRef> segmentStreams,
+                     IPlaybackSink* sink, ITimerHost* timerHost)
     : info_(std::move(info)),
       entriesFile_(std::move(entriesFile)),
       lot_(std::move(lot)),
