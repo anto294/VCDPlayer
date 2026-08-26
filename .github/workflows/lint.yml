@@ -41,20 +41,17 @@ jobs:
     steps:
       - uses: actions/checkout@v7
 
-      - uses: actions/setup-python@v7
-        with:
-          python-version: "3.x"
-
-      # Same pin rationale as clang-format above — .clang-tidy was curated
-      # and verified against this exact version.
-      - name: Install clang-tidy
-        run: pip install clang-tidy==22.1.8
-
+      # Unlike clang-format above, this is deliberately *not* the pip wheel:
+      # clang-tidy has to actually parse the code, and the pip build doesn't
+      # reliably auto-detect the system GCC's standard library headers on
+      # Linux (a known issue — it can miss <vector>/<string>/etc. depending
+      # on which GCC version it decides to trust). apt's clang-tidy is built
+      # against this distro's own GCC, so it doesn't have that problem.
       - name: Install build dependencies
         run: |
           sudo apt-get update
           sudo apt-get install -y \
-            build-essential cmake ninja-build pkg-config \
+            build-essential cmake ninja-build pkg-config clang-tidy \
             qt6-base-dev qt6-tools-dev qt6-l10n-tools libmpv-dev
 
       # clang-tidy needs a compile database to know each file's include
