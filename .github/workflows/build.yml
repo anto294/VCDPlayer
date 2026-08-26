@@ -225,6 +225,8 @@ jobs:
     permissions:
       contents: write
     steps:
+      - uses: actions/checkout@v7
+
       - uses: actions/download-artifact@v8
         with:
           path: artifacts
@@ -234,9 +236,31 @@ jobs:
           mkdir -p release
           find artifacts -type f \( -name "*.zip" -o -name "*.AppImage" \) -exec cp {} release/ \;
 
+      # Pulls this tag's own section out of CHANGELOG.md (between its "##
+      # [vX.Y.Z]" heading and the next one) so the release body is the
+      # curated changelog entry instead of GitHub's auto-generated commit
+      # list. Falls back to that auto-generated list if the tag has no
+      # matching heading (e.g. a hotfix tag nobody wrote a changelog for
+      # yet), so the release job never fails on a missing section.
+      - name: Extract changelog section for this tag
+        id: changelog
+        run: |
+          awk -v tag="[${GITHUB_REF_NAME}]" '
+            index($0, "## " tag) == 1 { found=1; next }
+            found && /^## \[/ { exit }
+            found { print }
+          ' CHANGELOG.md > release-notes.md
+          if [ -s release-notes.md ]; then
+            echo "found=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "found=false" >> "$GITHUB_OUTPUT"
+          fi
+
       - name: Create draft release
         uses: softprops/action-gh-release@v3
         with:
           draft: true
-          generate_release_notes: true
+          prerelease: ${{ contains(github.ref_name, '-') }}
+          generate_release_notes: ${{ steps.changelog.outputs.found != 'true' }}
+          body_path: ${{ steps.changelog.outputs.found == 'true' && 'release-notes.md' || null }}
           files: release/*
