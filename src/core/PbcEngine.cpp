@@ -114,6 +114,10 @@ void PbcEngine::onEof() {
 
   if (!currentDescriptor_) return;
   const PsdDescriptor& d = *currentDescriptor_;
+  // The two branches call goTo() identically on purpose: they're reached for
+  // different reasons (a real playlist vs. a non-interactive selection node)
+  // even though the resulting action is the same.
+  // NOLINTNEXTLINE(bugprone-branch-clone)
   if (d.type == PsdType::Playlist && d.nextOfs.kind == PsdOfs::Kind::Offset) {
     goTo(d.nextOfs.byteOffset);
   } else if (d.type == PsdType::Selection && d.choices.empty() && d.nextOfs.kind == PsdOfs::Kind::Offset) {

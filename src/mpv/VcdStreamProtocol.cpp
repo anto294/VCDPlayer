@@ -67,6 +67,9 @@ int OpenCb(void* userData, char* uri, mpv_stream_cb_info* info) {
   int id = 0;
   try {
     id = std::stoi(uriStr.substr(prefix.size()));
+    // This callback crosses into mpv's C API, so a C++ exception can't be
+    // let through; converting it to mpv's own error code is the handling.
+    // NOLINTNEXTLINE(bugprone-empty-catch)
   } catch (const std::exception&) {
     return MPV_ERROR_LOADING_FAILED;
   }

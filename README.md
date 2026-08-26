@@ -1,12 +1,13 @@
 # VCD Player
 
 [![Build](https://github.com/anto294/VCDPlayer/actions/workflows/build.yml/badge.svg)](https://github.com/anto294/VCDPlayer/actions/workflows/build.yml)
+[![Lint](https://github.com/anto294/VCDPlayer/actions/workflows/lint.yml/badge.svg)](https://github.com/anto294/VCDPlayer/actions/workflows/lint.yml)
 
 A cross-platform desktop player for Video CDs (VCD), built with Qt6 and
-[libmpv](https://mpv.io/). Windows and Linux are built and tested in CI
-(see [Prebuilt builds](#prebuilt-builds)); macOS should work (Qt6 + mpv are
-both available via Homebrew and the CMake setup doesn't assume a specific
-OS) but is untested and not part of CI.
+[libmpv](https://mpv.io/). Windows and Linux are built, packaged and tested
+in CI (see [Prebuilt builds](#prebuilt-builds)); macOS is also built in CI
+as a sanity check (Qt6 + mpv via Homebrew), but isn't packaged into a
+release artifact and isn't otherwise tested by hand.
 
 It reads a disc directly from its `.cue`/`.bin` image: parses the ISO9660
 filesystem and PBC (PlayBack Control) metadata, resolves every video track
@@ -101,6 +102,18 @@ or **Releases** for tagged versions.
 The `samples/` folder (git-ignored) is meant for local testing with your own
 VCD `.bin`/`.cue` dumps. **Do not commit VCD image dumps** — they are
 typically copyrighted commercial discs.
+
+## Contributing
+
+Code style is enforced by [.clang-format](.clang-format) and
+[.clang-tidy](.clang-tidy); the **Lint** workflow checks both on every PR. To
+run them locally:
+
+```sh
+find src -name '*.cpp' -o -name '*.h' | xargs clang-format -i
+clang-tidy -p build src/**/*.cpp   # needs a build/ configured with
+                                    # -DCMAKE_EXPORT_COMPILE_COMMANDS=ON
+```
 
 ## License
 

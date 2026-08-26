@@ -41,11 +41,14 @@ for size in 16 32 48 64 128 256 512; do
   cp "$repo_root/img/icon/${size}.png" "$theme_dir/vcdplayer.png"
 done
 
-tools_dir="$workdir/tools"
+# CI sets LINUXDEPLOY_CACHE_DIR to a path it persists with actions/cache, so
+# a warm cache skips these downloads entirely (each tool is 100+ MB); a local
+# run without the env var falls back to a throwaway dir under $workdir.
+tools_dir="${LINUXDEPLOY_CACHE_DIR:-$workdir/tools}"
 mkdir -p "$tools_dir"
-curl -fL -o "$tools_dir/linuxdeploy" \
+[ -x "$tools_dir/linuxdeploy" ] || curl -fL -o "$tools_dir/linuxdeploy" \
   "https://github.com/linuxdeploy/linuxdeploy/releases/download/continuous/linuxdeploy-${arch}.AppImage"
-curl -fL -o "$tools_dir/linuxdeploy-plugin-qt" \
+[ -x "$tools_dir/linuxdeploy-plugin-qt" ] || curl -fL -o "$tools_dir/linuxdeploy-plugin-qt" \
   "https://github.com/linuxdeploy/linuxdeploy-plugin-qt/releases/download/continuous/linuxdeploy-plugin-qt-${arch}.AppImage"
 chmod +x "$tools_dir"/linuxdeploy*
 

@@ -1,0 +1,84 @@
+name: Lint
+
+on:
+  push:
+    branches: [master]
+  pull_request:
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  format:
+    name: clang-format
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-python@v7
+        with:
+          python-version: "3.x"
+
+      # Pinned to the exact version .clang-format was authored/verified
+      # against (see the "Apply clang-format to existing source" commit) so
+      # this check can't drift out of sync with a distro package upgrade.
+      - name: Install clang-format
+        run: pip install clang-format==22.1.8
+
+      - name: Check formatting
+        run: |
+          files=$(find src -name '*.cpp' -o -name '*.h')
+          clang-format --dry-run --Werror $files
+
+  tidy:
+    name: clang-tidy
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-python@v7
+        with:
+          python-version: "3.x"
+
+      # Same pin rationale as clang-format above — .clang-tidy was curated
+      # and verified against this exact version.
+      - name: Install clang-tidy
+        run: pip install clang-tidy==22.1.8
+
+      - name: Install build dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            build-essential cmake ninja-build pkg-config \
+            qt6-base-dev qt6-tools-dev qt6-l10n-tools libmpv-dev
+
+      # clang-tidy needs a compile database to know each file's include
+      # paths/defines; it happily analyzes GCC-generated commands with its
+      # own (Clang) frontend, so this doesn't need a Clang build at all.
+      - name: Configure
+        run: cmake -S . -B build -G Ninja -DCMAKE_EXPORT_COMPILE_COMMANDS=ON
+
+      - name: Run clang-tidy
+        run: |
+          files=$(find src -name '*.cpp')
+          clang-tidy -p build --warnings-as-errors='*' $files
+
+  actionlint:
+    name: actionlint
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Install actionlint
+        run: bash <(curl -fsSL https://raw.githubusercontent.com/rhysd/actionlint/v1.7.12/scripts/download-actionlint.bash) 1.7.12
+
+      - name: Lint workflows
+        run: ./actionlint -color

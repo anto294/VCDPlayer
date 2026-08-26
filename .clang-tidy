@@ -1,0 +1,19 @@
+# Deliberately narrow to high-signal categories: bugprone/clang-analyzer catch
+# actual bugs, performance flags real waste. modernize/readability/
+# cppcoreguidelines were tried against this codebase and mostly fight its
+# existing (intentional) style — e.g. brace-less single-line ifs, short loop
+# variable names — rather than find defects, so they're left out rather than
+# fought check-by-check.
+Checks: >
+  -*,
+  bugprone-*,
+  clang-analyzer-*,
+  performance-*,
+  portability-*,
+  -bugprone-easily-swappable-parameters,
+  -performance-enum-size,
+  -portability-avoid-pragma-once
+
+WarningsAsErrors: ''
+HeaderFilterRegex: '(^|[/\\])src[/\\].*'
+FormatStyle: none
