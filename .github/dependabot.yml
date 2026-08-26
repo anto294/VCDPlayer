@@ -1,0 +1,12 @@
+version: 2
+updates:
+  # Keep GitHub Actions pinned to current major versions (security fixes,
+  # Node runtime bumps, etc.) without babysitting them by hand.
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+    groups:
+      github-actions:
+        patterns:
+          - "*"

@@ -1,5 +1,7 @@
 # VCD Player
 
+[![Build](https://github.com/anto294/VCDPlayer/actions/workflows/build.yml/badge.svg)](https://github.com/anto294/VCDPlayer/actions/workflows/build.yml)
+
 A cross-platform desktop player for Video CDs (VCD), built with Qt6 and
 [libmpv](https://mpv.io/). Windows and Linux are built and tested in CI
 (see [Prebuilt builds](#prebuilt-builds)); macOS should work (Qt6 + mpv are

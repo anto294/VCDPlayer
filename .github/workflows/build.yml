@@ -7,10 +7,25 @@ on:
   pull_request:
   workflow_dispatch:
 
+# Cancel superseded runs on the same branch/PR so pushing a fixup commit
+# doesn't burn CI minutes finishing a build nobody will look at. Left alone
+# for tag pushes: `github.ref` is unique per tag, so releases are never
+# cancelled by unrelated activity.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+# Least-privilege default: the GITHUB_TOKEN only needs to read the repo to
+# build it. The release job below is the sole exception and opts back into
+# `contents: write` for itself.
+permissions:
+  contents: read
+
 jobs:
   windows:
     name: Windows (${{ matrix.arch }})
     runs-on: ${{ matrix.os }}
+    timeout-minutes: 30
     strategy:
       fail-fast: false
       matrix:
@@ -25,12 +40,13 @@ jobs:
       run:
         shell: msys2 {0}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       - uses: msys2/setup-msys2@v2
         with:
           msystem: ${{ matrix.msystem }}
           update: true
+          cache: true
           install: zip
           pacboy: >-
             cc:p
@@ -51,14 +67,16 @@ jobs:
         run: |
           bash ci/package-windows.sh build/VCDPlayer.exe VCDPlayer-windows-${{ matrix.arch }}-portable
 
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         with:
           name: VCDPlayer-windows-${{ matrix.arch }}-portable
           path: dist/*.zip
+          if-no-files-found: error
 
   linux-appimage:
     name: Linux AppImage (${{ matrix.arch }})
     runs-on: ${{ matrix.os }}
+    timeout-minutes: 20
     strategy:
       fail-fast: false
       matrix:
@@ -70,7 +88,7 @@ jobs:
             appimage_arch: aarch64
             os: ubuntu-24.04-arm
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       - name: Install dependencies
         run: |
@@ -90,20 +108,22 @@ jobs:
         run: |
           bash ci/package-appimage.sh build/VCDPlayer ${{ matrix.appimage_arch }} VCDPlayer-linux-${{ matrix.arch }}
 
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         with:
           name: VCDPlayer-linux-${{ matrix.arch }}-appimage
           path: dist/*.AppImage
+          if-no-files-found: error
 
   release:
     name: Publish draft release
     needs: [windows, linux-appimage]
     if: startsWith(github.ref, 'refs/tags/v')
     runs-on: ubuntu-latest
+    timeout-minutes: 10
     permissions:
       contents: write
     steps:
-      - uses: actions/download-artifact@v4
+      - uses: actions/download-artifact@v8
         with:
           path: artifacts
 
@@ -113,7 +133,8 @@ jobs:
           find artifacts -type f \( -name "*.zip" -o -name "*.AppImage" \) -exec cp {} release/ \;
 
       - name: Create draft release
-        uses: softprops/action-gh-release@v2
+        uses: softprops/action-gh-release@v3
         with:
           draft: true
+          generate_release_notes: true
           files: release/*
