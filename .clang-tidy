@@ -4,6 +4,15 @@
 # existing (intentional) style — e.g. brace-less single-line ifs, short loop
 # variable names — rather than find defects, so they're left out rather than
 # fought check-by-check.
+#
+# clang-analyzer-cplusplus.NewDeleteLeaks is further excluded: every
+# QMetaObject::invokeMethod(obj, lambda, Qt::QueuedConnection) call (used in
+# main.cpp and MpvPlayer.cpp) trips it. Qt allocates a slot-object to own the
+# functor and frees it itself once the queued call runs, but the analyzer
+# can't see across that ownership transfer and reports a "leak" anchored
+# inside <QtCore/qobjectdefs.h>, not at the call site — a NOLINT in our own
+# code wouldn't even land on the right line. Well-known Qt + clang-analyzer
+# friction, not something specific to this codebase.
 Checks: >
   -*,
   bugprone-*,
@@ -12,7 +21,8 @@ Checks: >
   portability-*,
   -bugprone-easily-swappable-parameters,
   -performance-enum-size,
-  -portability-avoid-pragma-once
+  -portability-avoid-pragma-once,
+  -clang-analyzer-cplusplus.NewDeleteLeaks
 
 WarningsAsErrors: ''
 HeaderFilterRegex: '(^|[/\\])src[/\\].*'
