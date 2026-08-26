@@ -1,0 +1,69 @@
+name: Bug report
+description: Something doesn't work the way it should
+labels: ["bug"]
+body:
+  - type: textarea
+    id: description
+    attributes:
+      label: What happened?
+      description: What did you expect instead?
+    validations:
+      required: true
+
+  - type: textarea
+    id: repro
+    attributes:
+      label: Steps to reproduce
+      placeholder: |
+        1. Open disc.cue with ...
+        2. Navigate the PBC menu to ...
+        3. ...
+    validations:
+      required: true
+
+  - type: dropdown
+    id: os
+    attributes:
+      label: OS
+      options:
+        - Windows (x64)
+        - Windows (arm64)
+        - Linux (x86_64)
+        - Linux (arm64)
+        - macOS
+    validations:
+      required: true
+
+  - type: input
+    id: version
+    attributes:
+      label: VCDPlayer version / commit
+      description: The release tag, or `git rev-parse --short HEAD` for a source build.
+    validations:
+      required: true
+
+  - type: dropdown
+    id: build-source
+    attributes:
+      label: How did you get VCDPlayer?
+      options:
+        - Prebuilt release (GitHub Releases)
+        - Built from source
+    validations:
+      required: true
+
+  - type: textarea
+    id: disc
+    attributes:
+      label: Disc / image details (if relevant)
+      description: >-
+        Does the disc use PBC menus or plain sequential playback? Anything
+        unusual about the .cue/.bin (multi-track, non-standard authoring
+        tool, etc.)? Not needed for UI-only bugs.
+
+  - type: textarea
+    id: logs
+    attributes:
+      label: Relevant log output
+      description: mpv/Qt console output, if the app was run from a terminal.
+      render: shell
