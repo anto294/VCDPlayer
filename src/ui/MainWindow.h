@@ -69,6 +69,20 @@ class MainWindow : public QMainWindow {
   // tells the user to restart.
   void setRenderBackendSetting(const QString& value);
 
+  // Unlike the render backend itself, this applies immediately — it's just
+  // an mpv option (glsl-shaders), not something that needs the render
+  // context rebuilt — but only has any visible effect while the Hardware
+  // (OpenGL) backend is active, since it hooks into mpv's GPU shader
+  // pipeline (see shaders/README.md and MpvPlayer::initRenderContext()).
+  void setAiUpscalingEnabled(bool enabled);
+
+  // Also applies immediately. mpv's software renderer already scales with
+  // Lanczos + full chroma interpolation by default (about as good as
+  // libswscale itself gets); this layers a sharpening pass on top (sws-ls/
+  // sws-cs), which is what actually helps a source stretched by as large a
+  // factor as VCD's 352x288 usually is. Only affects the Software backend.
+  void setCpuUpscalingEnabled(bool enabled);
+
   // Switches the active UI language ("en"/"it"), persists the choice, and
   // rebuilds every translatable widget in place — no restart required.
   void setLanguage(const QString& languageCode);
@@ -84,7 +98,8 @@ class MainWindow : public QMainWindow {
   DiscSession* session_;
   VideoWidget* video_;
   RemotePanel* remote_;
-  QWidget* toggleRailSpacer_;  // slot for panelToggleButton_ between video and panel; hidden when panel is collapsed so the video reclaims that width
+  QWidget* toggleRailSpacer_;  // slot for panelToggleButton_ between video and panel; hidden when panel is collapsed so
+                               // the video reclaims that width
   QWidget* progressRow_;
   QSlider* seekBar_;
   QLabel* timeCurrentLabel_;
@@ -97,6 +112,8 @@ class MainWindow : public QMainWindow {
   QAction* showProgressBarAction_ = nullptr;
   QAction* showTimeLabelAction_ = nullptr;
   QAction* showRemoteAction_ = nullptr;
+  QAction* aiUpscalingAction_ = nullptr;
+  QAction* cpuUpscalingAction_ = nullptr;
 
   bool showRemote_ = true;
   bool showProgressBarSetting_ = false;
@@ -111,4 +128,6 @@ class MainWindow : public QMainWindow {
   QTranslator* translator_ = nullptr;
 
   QString renderBackendSetting_ = QStringLiteral("auto");
+  bool aiUpscalingEnabled_ = false;
+  bool cpuUpscalingEnabled_ = false;
 };

@@ -21,6 +21,11 @@ mkdir -p "$appdir/usr/bin" dist
 
 cp "$exe" "$appdir/usr/bin/"
 
+# Bundled GLSL user shaders (see shaders/README.md): CMake copies them next
+# to the built exe, so they're already sitting right beside it here too.
+shaders_dir="$(dirname "$exe")/shaders"
+[ -d "$shaders_dir" ] && cp -r "$shaders_dir" "$appdir/usr/bin/"
+
 cat > "$workdir/vcdplayer.desktop" <<EOF
 [Desktop Entry]
 Type=Application

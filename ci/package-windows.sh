@@ -16,6 +16,11 @@ rm -rf dist
 mkdir -p "$dist_dir"
 cp "$exe" "$dist_dir/"
 
+# Bundled GLSL user shaders (see shaders/README.md): CMake copies them next
+# to the built exe, so they're already sitting right beside it here too.
+shaders_dir="$(dirname "$exe")/shaders"
+[ -d "$shaders_dir" ] && cp -r "$shaders_dir" "$dist_dir/"
+
 # Deliberately not `ldd`: MSYS2's ldd resolves a native (non-MSYS) PE
 # executable's imports by actually running it, which for a Qt6 GUI app
 # means it launches the app and blocks on its event loop instead of

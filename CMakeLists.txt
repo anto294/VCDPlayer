@@ -87,3 +87,15 @@ if(WIN32 AND NOT MPV_FOUND)
             $<TARGET_FILE_DIR:VCDPlayer>
     )
 endif()
+
+# Bundled GLSL user shaders (Experimental > AI upscaling — see
+# shaders/README.md) are plain files mpv reads by path at runtime, not Qt
+# resources: mpv has no notion of Qt's :/ resource paths. Copied next to the
+# executable on every platform so applicationDirPath()+"/shaders" always
+# resolves the same way in a dev build and in a packaged one (see
+# ci/package-windows.sh / ci/package-appimage.sh for the latter).
+add_custom_command(TARGET VCDPlayer POST_BUILD
+    COMMAND ${CMAKE_COMMAND} -E copy_directory
+        ${CMAKE_SOURCE_DIR}/shaders
+        $<TARGET_FILE_DIR:VCDPlayer>/shaders
+)

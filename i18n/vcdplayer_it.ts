@@ -168,8 +168,8 @@
         <translation>Informazioni su VCD Player</translation>
     </message>
     <message>
-        <source>&lt;h3&gt;VCD Player&lt;/h3&gt;&lt;p&gt;A native Video CD player with full PBC (Playback Control) menu support.&lt;/p&gt;&lt;p&gt;Built with Qt %1 and libmpv.&lt;/p&gt;</source>
-        <translation>&lt;h3&gt;VCD Player&lt;/h3&gt;&lt;p&gt;Un lettore Video CD nativo con supporto completo ai menu PBC (Playback Control).&lt;/p&gt;&lt;p&gt;Realizzato con Qt %1 e libmpv.&lt;/p&gt;</translation>
+        <source>&lt;h3&gt;VCD Player&lt;/h3&gt;&lt;p&gt;A native Video CD player with full PBC (Playback Control) menu support.&lt;/p&gt;&lt;p&gt;Built with Qt %1 and libmpv.&lt;/p&gt;&lt;p&gt;Experimental AI upscaling uses the Anime4K shaders by bloc97 (MIT License).&lt;/p&gt;</source>
+        <translation>&lt;h3&gt;VCD Player&lt;/h3&gt;&lt;p&gt;Un lettore Video CD nativo con supporto completo ai menu PBC (Playback Control).&lt;/p&gt;&lt;p&gt;Realizzato con Qt %1 e libmpv.&lt;/p&gt;&lt;p&gt;L'upscaling AI sperimentale usa gli shader Anime4K di bloc97 (licenza MIT).&lt;/p&gt;</translation>
     </message>
     <message>
         <source>Report an issue</source>
@@ -202,6 +202,34 @@
     <message>
         <source>The new rendering setting will take effect the next time VCD Player starts.</source>
         <translation>La nuova impostazione di rendering avrà effetto al prossimo avvio di VCD Player.</translation>
+    </message>
+    <message>
+        <source>&amp;Experimental</source>
+        <translation>&amp;Sperimentale</translation>
+    </message>
+    <message>
+        <source>AI upscaling (Anime4K, GPU)</source>
+        <translation>Upscaling AI (Anime4K, GPU)</translation>
+    </message>
+    <message>
+        <source>AI upscaling</source>
+        <translation>Upscaling AI</translation>
+    </message>
+    <message>
+        <source>AI upscaling only has an effect with the Hardware (GPU) rendering backend, which isn't active right now. Switch to it from Advanced &gt; Rendering and restart VCD Player.</source>
+        <translation>L'upscaling AI ha effetto solo con il rendering Hardware (GPU), che al momento non è attivo. Passa a Hardware da Avanzate &gt; Rendering e riavvia VCD Player.</translation>
+    </message>
+    <message>
+        <source>CPU upscaling (sharpen, no GPU needed)</source>
+        <translation>Upscaling CPU (nitidezza, senza GPU)</translation>
+    </message>
+    <message>
+        <source>CPU upscaling</source>
+        <translation>Upscaling CPU</translation>
+    </message>
+    <message>
+        <source>CPU upscaling only affects mpv's Software rendering path; the Hardware (GPU) backend is active right now, so this has no visible effect until you switch back to Software from Advanced &gt; Rendering.</source>
+        <translation>L'upscaling CPU ha effetto solo sul rendering Software di mpv; al momento è attivo il rendering Hardware (GPU), quindi non avrà alcun effetto visibile finché non torni a Software da Avanzate &gt; Rendering.</translation>
     </message>
 </context>
 <context>

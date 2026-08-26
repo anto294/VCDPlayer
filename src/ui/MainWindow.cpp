@@ -1,8 +1,5 @@
 #include "MainWindow.h"
 
-#include <algorithm>
-#include <cmath>
-
 #include <QAction>
 #include <QActionGroup>
 #include <QContextMenuEvent>
@@ -14,6 +11,7 @@
 #include <QDropEvent>
 #include <QFileDialog>
 #include <QFileInfo>
+#include <QHBoxLayout>
 #include <QKeyEvent>
 #include <QLabel>
 #include <QMenu>
@@ -30,7 +28,8 @@
 #include <QTranslator>
 #include <QUrl>
 #include <QVBoxLayout>
-#include <QHBoxLayout>
+#include <algorithm>
+#include <cmath>
 
 #include "../app/DiscSession.h"
 #include "../mpv/MpvPlayer.h"
@@ -42,12 +41,36 @@ namespace {
 constexpr int kSeekBarMax = 1000;
 constexpr int kWindowMargin = 24;
 constexpr int kLayoutSpacing = 10;
-constexpr int kPanelWidth = 224;  // must match RemotePanel::setFixedWidth()
+constexpr int kPanelWidth = 224;      // must match RemotePanel::setFixedWidth()
 constexpr int kToggleRailWidth = 36;  // permanent slot for panelToggleButton_, see updateOverlayPositions()
+
+// mpv's software renderer defaults to zimg for the actual scale step
+// (sws-allow-zimg=yes by default) when it's compiled in, as it is here —
+// and zimg has no equivalent to libswscale's sharpen params, so sws-ls/
+// sws-cs below are silently ignored as long as zimg is the one doing the
+// work (found by reading video/sws_utils.c's allow_zimg()/mp_sws_reinit()
+// after the toggle visibly did nothing). Turning zimg off for these two
+// options to have any effect at all is a real quality trade-off — zimg is
+// generally the nicer scaler — but that's the whole point of this being an
+// explicit, opt-in "sharpen mode" rather than always-on.
+// The sharpen values themselves counter the softness a large upscale
+// factor (VCD's 352x288 source, stretched to whatever the window ends up)
+// tends to leave behind; luma sharpened more than chroma is the usual
+// balance, since sharpening chroma harder introduces color fringing before
+// it looks any crisper.
+constexpr double kCpuUpscaleLumaSharpen = 0.5;
+constexpr double kCpuUpscaleChromaSharpen = 0.3;
 
 QString formatTime(double seconds) {
   const int s = static_cast<int>(std::max(0.0, std::floor(seconds)));
   return QStringLiteral("%1:%2").arg(s / 60, 2, 10, QChar('0')).arg(s % 60, 2, 10, QChar('0'));
+}
+
+// Shipped as a plain file next to the executable (see shaders/README.md and
+// the CMakeLists.txt copy step), not a Qt resource — mpv reads shader files
+// by path itself and has no notion of Qt's :/ resource paths.
+QString AiUpscaleShaderPath() {
+  return QCoreApplication::applicationDirPath() + QStringLiteral("/shaders/Anime4K_Upscale_CNN_x2_M.glsl");
 }
 
 // Keeps a single child locked to a 4:3 box, centered within whatever space
@@ -59,9 +82,7 @@ QString formatTime(double seconds) {
 // bigger box.
 class AspectRatioBox : public QWidget {
  public:
-  AspectRatioBox(QWidget* content, QWidget* parent) : QWidget(parent), content_(content) {
-    content_->setParent(this);
-  }
+  AspectRatioBox(QWidget* content, QWidget* parent) : QWidget(parent), content_(content) { content_->setParent(this); }
 
  protected:
   void resizeEvent(QResizeEvent*) override {
@@ -116,10 +137,30 @@ MainWindow::MainWindow(QWidget* parent) : QMainWindow(parent) {
     backend = MpvPlayer::detectBestRenderBackend();
   }
   player_->setPreferredRenderBackend(backend);
+
+  // Just an mpv option (see setAiUpscalingEnabled()), so it's safe to set
+  // straight away regardless of which backend ends up active — it only
+  // does anything once the GPU shader pipeline (Hardware/OpenGL backend)
+  // is actually in use. Set directly rather than through
+  // setAiUpscalingEnabled() so startup doesn't pop the "requires Hardware
+  // rendering" notice on every launch when the setting is on but Automatic
+  // resolved to Software.
+  aiUpscalingEnabled_ = QSettings().value(QStringLiteral("aiUpscaling"), false).toBool();
+  if (aiUpscalingEnabled_) player_->setPropertyString("glsl-shaders", AiUpscaleShaderPath());
+
+  // Same idea as above, but for the Software backend's sharpen-on-top-of-
+  // Lanczos pass (see setCpuUpscalingEnabled()): applied directly here to
+  // skip the "wrong backend active" notice on every launch.
+  cpuUpscalingEnabled_ = QSettings().value(QStringLiteral("cpuUpscaling"), false).toBool();
+  if (cpuUpscalingEnabled_) {
+    player_->setPropertyFlag("sws-allow-zimg", false);
+    player_->setPropertyDouble("sws-ls", kCpuUpscaleLumaSharpen);
+    player_->setPropertyDouble("sws-cs", kCpuUpscaleChromaSharpen);
+  }
+
   session_ = new DiscSession(player_, this);
 
-  const QString screenshotDir =
-      QStandardPaths::writableLocation(QStandardPaths::PicturesLocation) + "/VCDPlayer";
+  const QString screenshotDir = QStandardPaths::writableLocation(QStandardPaths::PicturesLocation) + "/VCDPlayer";
   QDir().mkpath(screenshotDir);
   player_->setPropertyString("screenshot-directory", screenshotDir);
 
@@ -197,8 +238,7 @@ MainWindow::MainWindow(QWidget* parent) : QMainWindow(parent) {
   connect(panelToggleButton_, &QPushButton::clicked, this, &MainWindow::toggleRemotePanel);
 
   connect(remote_, &RemotePanel::openDiscRequested, this, &MainWindow::openDiscDialog);
-  connect(remote_, &RemotePanel::remoteButtonPressed, this,
-          [this](vcd::RemoteButton btn) { sendRemoteButton(btn); });
+  connect(remote_, &RemotePanel::remoteButtonPressed, this, [this](vcd::RemoteButton btn) { sendRemoteButton(btn); });
   connect(remote_, &RemotePanel::numberPressed, this,
           [this](int digit) { sendRemoteButton(vcd::RemoteButton::Number, digit); });
   connect(remote_, &RemotePanel::muteToggled, this, &MainWindow::toggleMute);
@@ -221,10 +261,10 @@ MainWindow::MainWindow(QWidget* parent) : QMainWindow(parent) {
   connect(player_, &MpvPlayer::propertyChanged, this, &MainWindow::onMpvPropertyChanged);
   connect(player_, &MpvPlayer::logMessage, this, [](const QString& text) { qWarning().noquote() << text; });
 
-  connect(session_, &DiscSession::discLoaded, this, [this](QString volumeId, bool pbcEnabled, int chapters) {
+  connect(session_, &DiscSession::discLoaded, this, [this](const QString& volumeId, bool pbcEnabled, int chapters) {
     currentDiscTitle_ = volumeId.isEmpty() ? tr("Disc") : volumeId;
     const QString status = pbcEnabled ? tr("PBC active · %1 chapters").arg(chapters)
-                                       : tr("Sequential playback · %1 chapters").arg(chapters);
+                                      : tr("Sequential playback · %1 chapters").arg(chapters);
     remote_->setDiscInfo(currentDiscTitle_, status);
   });
   connect(session_, &DiscSession::stateChanged, this, [this](int kind, int choiceCount) {
@@ -354,20 +394,27 @@ void MainWindow::buildMenuBar() {
   renderAutoAction->setCheckable(true);
   renderAutoAction->setChecked(renderBackendSetting_ == QStringLiteral("auto"));
   renderingGroup->addAction(renderAutoAction);
-  connect(renderAutoAction, &QAction::triggered, this,
-          [this]() { setRenderBackendSetting(QStringLiteral("auto")); });
+  connect(renderAutoAction, &QAction::triggered, this, [this]() { setRenderBackendSetting(QStringLiteral("auto")); });
   QAction* renderSwAction = renderingMenu->addAction(tr("Software"));
   renderSwAction->setCheckable(true);
   renderSwAction->setChecked(renderBackendSetting_ == QStringLiteral("software"));
   renderingGroup->addAction(renderSwAction);
-  connect(renderSwAction, &QAction::triggered, this,
-          [this]() { setRenderBackendSetting(QStringLiteral("software")); });
+  connect(renderSwAction, &QAction::triggered, this, [this]() { setRenderBackendSetting(QStringLiteral("software")); });
   QAction* renderHwAction = renderingMenu->addAction(tr("Hardware (GPU)"));
   renderHwAction->setCheckable(true);
   renderHwAction->setChecked(renderBackendSetting_ == QStringLiteral("hardware"));
   renderingGroup->addAction(renderHwAction);
-  connect(renderHwAction, &QAction::triggered, this,
-          [this]() { setRenderBackendSetting(QStringLiteral("hardware")); });
+  connect(renderHwAction, &QAction::triggered, this, [this]() { setRenderBackendSetting(QStringLiteral("hardware")); });
+
+  auto* experimentalMenu = menuBar()->addMenu(tr("&Experimental"));
+  aiUpscalingAction_ = experimentalMenu->addAction(tr("AI upscaling (Anime4K, GPU)"));
+  aiUpscalingAction_->setCheckable(true);
+  aiUpscalingAction_->setChecked(aiUpscalingEnabled_);
+  connect(aiUpscalingAction_, &QAction::triggered, this, &MainWindow::setAiUpscalingEnabled);
+  cpuUpscalingAction_ = experimentalMenu->addAction(tr("CPU upscaling (sharpen, no GPU needed)"));
+  cpuUpscalingAction_->setCheckable(true);
+  cpuUpscalingAction_->setChecked(cpuUpscalingEnabled_);
+  connect(cpuUpscalingAction_, &QAction::triggered, this, &MainWindow::setCpuUpscalingEnabled);
 
   auto* infoMenu = menuBar()->addMenu(tr("&Info"));
   QAction* aboutAction = infoMenu->addAction(tr("About VCD Player"));
@@ -424,10 +471,8 @@ QMenu* MainWindow::buildContextMenu() {
   connect(aotItem, &QAction::triggered, this, &MainWindow::toggleAlwaysOnTop);
 
   auto* zoomMenu = menu->addMenu(tr("Zoom"));
-  connect(zoomMenu->addAction(tr("Zoom in")), &QAction::triggered, this,
-          [this]() { applyZoom(ZoomDirection::In); });
-  connect(zoomMenu->addAction(tr("Zoom out")), &QAction::triggered, this,
-          [this]() { applyZoom(ZoomDirection::Out); });
+  connect(zoomMenu->addAction(tr("Zoom in")), &QAction::triggered, this, [this]() { applyZoom(ZoomDirection::In); });
+  connect(zoomMenu->addAction(tr("Zoom out")), &QAction::triggered, this, [this]() { applyZoom(ZoomDirection::Out); });
   connect(zoomMenu->addAction(tr("Reset zoom")), &QAction::triggered, this,
           [this]() { applyZoom(ZoomDirection::Reset); });
   menu->addSeparator();
@@ -550,7 +595,8 @@ void MainWindow::showAboutDialog() {
   box.setTextFormat(Qt::RichText);
   box.setText(tr("<h3>VCD Player</h3>"
                  "<p>A native Video CD player with full PBC (Playback Control) menu support.</p>"
-                 "<p>Built with Qt %1 and libmpv.</p>")
+                 "<p>Built with Qt %1 and libmpv.</p>"
+                 "<p>Experimental AI upscaling uses the Anime4K shaders by bloc97 (MIT License).</p>")
                   .arg(QString::fromLatin1(QT_VERSION_STR)));
   QPushButton* reportButton = box.addButton(tr("Report an issue"), QMessageBox::ActionRole);
   box.addButton(QMessageBox::Ok);
@@ -565,7 +611,51 @@ void MainWindow::setRenderBackendSetting(const QString& value) {
   renderBackendSetting_ = value;
   QSettings().setValue(QStringLiteral("renderBackend"), value);
   QMessageBox::information(this, tr("Restart required"),
-                            tr("The new rendering setting will take effect the next time VCD Player starts."));
+                           tr("The new rendering setting will take effect the next time VCD Player starts."));
+}
+
+void MainWindow::setAiUpscalingEnabled(bool enabled) {
+  aiUpscalingEnabled_ = enabled;
+  QSettings().setValue(QStringLiteral("aiUpscaling"), enabled);
+  // A plain mpv option, applied to the already-running instance right away
+  // — no restart needed, unlike the render backend itself.
+  player_->setPropertyString("glsl-shaders", enabled ? AiUpscaleShaderPath() : QString());
+  if (enabled && player_->renderBackend() != MpvPlayer::RenderBackend::OpenGL) {
+    QMessageBox::information(
+        this, tr("AI upscaling"),
+        tr("AI upscaling only has an effect with the Hardware (GPU) rendering backend, which isn't active right "
+           "now. Switch to it from Advanced > Rendering and restart VCD Player."));
+  }
+}
+
+void MainWindow::setCpuUpscalingEnabled(bool enabled) {
+  cpuUpscalingEnabled_ = enabled;
+  QSettings().setValue(QStringLiteral("cpuUpscaling"), enabled);
+  // zimg (on by default, see the constants' comment above) has to be turned
+  // off for sws-ls/sws-cs to have any effect at all — it's what actually
+  // does the scaling otherwise, and it has no sharpen-equivalent option of
+  // its own.
+  player_->setPropertyFlag("sws-allow-zimg", !enabled);
+  player_->setPropertyDouble("sws-ls", enabled ? kCpuUpscaleLumaSharpen : 0.0);
+  player_->setPropertyDouble("sws-cs", enabled ? kCpuUpscaleChromaSharpen : 0.0);
+  // Without this, mpv's SW backend just keeps using the scaler it built
+  // before this toggle — it only reconfigures on a target-size change, not
+  // on these options changing (see refreshSoftwareScaler()) — so the change
+  // above would otherwise silently do nothing until the window is resized.
+  player_->refreshSoftwareScaler();
+  // refreshSoftwareScaler() only primes mpv to reconfigure on the *next*
+  // render() call — during active playback that happens within one frame
+  // on its own, but paused/idle nothing repaints VideoWidget until
+  // something else does, which reads as "the toggle did nothing" even
+  // though it took effect internally. Forcing one paintEvent now makes it
+  // visible immediately regardless of play state.
+  video_->update();
+  if (enabled && player_->renderBackend() == MpvPlayer::RenderBackend::OpenGL) {
+    QMessageBox::information(
+        this, tr("CPU upscaling"),
+        tr("CPU upscaling only affects mpv's Software rendering path; the Hardware (GPU) backend is active right "
+           "now, so this has no visible effect until you switch back to Software from Advanced > Rendering."));
+  }
 }
 
 void MainWindow::setLanguage(const QString& languageCode) {
