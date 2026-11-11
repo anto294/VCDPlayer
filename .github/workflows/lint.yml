@@ -63,6 +63,20 @@ jobs:
       - name: Run clang-tidy
         run: find src -name '*.cpp' -exec clang-tidy -p build --warnings-as-errors='*' {} +
 
+  # actionlint (below) only shellchecks the inline `run:` blocks inside the
+  # workflows; the packaging scripts under ci/ that actually produce the
+  # release artifacts are standalone files it never looks at. shellcheck is
+  # preinstalled on GitHub's Ubuntu runners.
+  shellcheck:
+    name: shellcheck
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Check CI scripts
+        run: shellcheck ci/*.sh
+
   actionlint:
     name: actionlint
     runs-on: ubuntu-24.04
