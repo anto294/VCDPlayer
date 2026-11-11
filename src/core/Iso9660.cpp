@@ -11,8 +11,6 @@ namespace {
 
 constexpr int64_t kPvdLbaOffset = 16;  // relative to the data track start (LBA 0 = INDEX01 of track 1)
 
-uint16_t readU16LE(const uint8_t* p) { return static_cast<uint16_t>(p[0]) | (static_cast<uint16_t>(p[1]) << 8); }
-
 uint32_t readU32LE(const uint8_t* p) {
   return static_cast<uint32_t>(p[0]) | (static_cast<uint32_t>(p[1]) << 8) | (static_cast<uint32_t>(p[2]) << 16) |
          (static_cast<uint32_t>(p[3]) << 24);
