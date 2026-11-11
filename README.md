@@ -58,12 +58,12 @@ brew install mpv
 ```
 
 **Windows**: the tested setup (same as CI) is [MSYS2](https://www.msys2.org/),
-which packages mpv for both MINGW64 (x64) and CLANGARM64 (arm64) with a
+which packages mpv for both UCRT64 (x64) and CLANGARM64 (arm64) with a
 `pkg-config` file, so CMake finds it the same way it does on Linux/macOS:
 
 ```sh
-# from an MSYS2 MINGW64 or CLANGARM64 shell
-pacman -S mingw-w64-x86_64-mpv mingw-w64-x86_64-pkgconf   # MINGW64 (x64)
+# from an MSYS2 UCRT64 or CLANGARM64 shell
+pacman -S mingw-w64-ucrt-x86_64-mpv mingw-w64-ucrt-x86_64-pkgconf   # UCRT64 (x64)
 pacman -S mingw-w64-clang-aarch64-mpv mingw-w64-clang-aarch64-pkgconf  # CLANGARM64 (arm64)
 ```
 

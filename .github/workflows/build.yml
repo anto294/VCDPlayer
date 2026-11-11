@@ -42,10 +42,10 @@ jobs:
     steps:
       - id: set
         run: |
-          windows='[{"arch":"x64","msystem":"MINGW64","os":"windows-2025"}]'
+          windows='[{"arch":"x64","msystem":"UCRT64","os":"windows-2025"}]'
           linux='[{"arch":"x86_64","appimage_arch":"x86_64","os":"ubuntu-24.04"}]'
           if [ "${{ github.event_name }}" != "pull_request" ]; then
-            windows='[{"arch":"x64","msystem":"MINGW64","os":"windows-2025"},{"arch":"arm64","msystem":"CLANGARM64","os":"windows-11-arm"}]'
+            windows='[{"arch":"x64","msystem":"UCRT64","os":"windows-2025"},{"arch":"arm64","msystem":"CLANGARM64","os":"windows-11-arm"}]'
             linux='[{"arch":"x86_64","appimage_arch":"x86_64","os":"ubuntu-24.04"},{"arch":"arm64","appimage_arch":"aarch64","os":"ubuntu-24.04-arm"}]'
           fi
           echo "windows=$windows" >> "$GITHUB_OUTPUT"
