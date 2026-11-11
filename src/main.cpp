@@ -1,6 +1,7 @@
 #include <QApplication>
 #include <QIcon>
 #include <QSize>
+#include <clocale>
 #include <cstdio>
 
 #include "ui/MainWindow.h"
@@ -35,6 +36,15 @@ int main(int argc, char** argv) {
   qInstallMessageHandler(FlushingMessageHandler);
 
   QApplication app(argc, argv);
+  // On Unix, QApplication's constructor calls setlocale(LC_ALL, ""), which
+  // on any system whose locale uses a decimal comma (it_IT, de_DE, ...)
+  // makes mpv_create() refuse to run ("Non-C locale detected"): libmpv
+  // parses floating-point option values with the C library and requires
+  // LC_NUMERIC to be "C". Must come after QApplication (which would undo
+  // it) and before MainWindow creates the player. Qt's own number
+  // formatting goes through QLocale, not the C locale, so the UI is
+  // unaffected.
+  std::setlocale(LC_NUMERIC, "C");
   app.setApplicationName("VCD Player");
   app.setOrganizationName("VCD Player");
   app.setWindowIcon(AppIcon());
