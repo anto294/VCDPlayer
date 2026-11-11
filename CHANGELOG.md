@@ -3,6 +3,14 @@
 Notable changes to VCD Player, release by release. Format loosely follows
 [Keep a Changelog](https://keepachangelog.com/).
 
+## [Unreleased]
+
+### Added
+
+- CI: CodeQL security analysis (every push/PR plus a weekly rescan),
+  shellcheck for the `ci/` packaging scripts, and an optional automated
+  PR review workflow (enabled by an `ANTHROPIC_API_KEY` secret).
+
 ## [v0.1.0-alpha] - 2026-08-26
 
 ### Added

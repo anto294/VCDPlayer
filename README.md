@@ -2,6 +2,7 @@
 
 [![Build](https://github.com/anto294/VCDPlayer/actions/workflows/build.yml/badge.svg)](https://github.com/anto294/VCDPlayer/actions/workflows/build.yml)
 [![Lint](https://github.com/anto294/VCDPlayer/actions/workflows/lint.yml/badge.svg)](https://github.com/anto294/VCDPlayer/actions/workflows/lint.yml)
+[![CodeQL](https://github.com/anto294/VCDPlayer/actions/workflows/codeql.yml/badge.svg)](https://github.com/anto294/VCDPlayer/actions/workflows/codeql.yml)
 
 A cross-platform desktop player for Video CDs (VCD), built with Qt6 and
 [libmpv](https://mpv.io/). Windows and Linux are built, packaged and tested
@@ -113,8 +114,11 @@ typically copyrighted commercial discs.
 ## Contributing
 
 Code style is enforced by [.clang-format](.clang-format) and
-[.clang-tidy](.clang-tidy); the **Lint** workflow checks both on every PR. To
-run them locally:
+[.clang-tidy](.clang-tidy); the **Lint** workflow checks both on every PR
+(plus shellcheck on the `ci/` scripts and actionlint on the workflows).
+**CodeQL** runs a security analysis of every PR, and when the repository has
+an `ANTHROPIC_API_KEY` secret the **Review** workflow also posts an automated
+code review. To run the style checks locally:
 
 ```sh
 find src -name '*.cpp' -o -name '*.h' | xargs clang-format -i
