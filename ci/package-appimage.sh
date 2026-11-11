@@ -57,6 +57,23 @@ mkdir -p "$tools_dir"
   "https://github.com/linuxdeploy/linuxdeploy-plugin-qt/releases/download/continuous/linuxdeploy-plugin-qt-${arch}.AppImage"
 chmod +x "$tools_dir"/linuxdeploy*
 
+# linuxdeploy-plugin-qt only bundles the xcb platform plugin by default, so
+# on a Wayland session Qt printed 'Could not find the Qt platform plugin
+# "wayland"' and fell back to XWayland. Bundle the Wayland plugins too
+# (the Qt plugin then also pulls in their shell-integration/decoration
+# helpers). Discovered rather than hardcoded: Qt <= 6.6 ships
+# libqwayland-egl.so + libqwayland-generic.so, newer Qt a single
+# libqwayland.so. Skipped if the build machine has no qt6-wayland at all.
+qmake_bin="$(command -v qmake6 || command -v qmake || true)"
+if [ -n "$qmake_bin" ]; then
+  platforms_dir="$("$qmake_bin" -query QT_INSTALL_PLUGINS)/platforms"
+  wayland_plugins="$(find "$platforms_dir" -maxdepth 1 -name 'libqwayland*.so' -printf '%f;' 2>/dev/null || true)"
+  if [ -n "$wayland_plugins" ]; then
+    export EXTRA_PLATFORM_PLUGINS="${wayland_plugins%;}"
+    echo "Bundling Wayland platform plugins: $EXTRA_PLATFORM_PLUGINS"
+  fi
+fi
+
 cd "$workdir"
 PATH="$tools_dir:$PATH" "$tools_dir/linuxdeploy" \
   --appdir "$appdir" \
