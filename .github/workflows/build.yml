@@ -187,7 +187,11 @@ jobs:
     # Homebrew and CMakeLists.txt makes no Windows/Linux-only assumptions —
     # this job is what actually backs that claim instead of just asserting it.
     name: macOS (build only)
-    runs-on: macos-14
+    # Floating label on purpose: this job only checks that the code still
+    # builds on current macOS + Homebrew, so following GitHub's newest image
+    # is the point — and a pinned version (as macos-14 was) eventually gets
+    # retired and the job stops running at all.
+    runs-on: macos-latest
     timeout-minutes: 20
     steps:
       - uses: actions/checkout@v7
