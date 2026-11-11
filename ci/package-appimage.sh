@@ -65,9 +65,10 @@ chmod +x "$tools_dir"/linuxdeploy*
 # libqwayland-egl.so + libqwayland-generic.so, newer Qt a single
 # libqwayland.so. Skipped if the build machine has no qt6-wayland at all.
 qmake_bin="$(command -v qmake6 || command -v qmake || true)"
+qt_plugins_dir=""
 if [ -n "$qmake_bin" ]; then
-  platforms_dir="$("$qmake_bin" -query QT_INSTALL_PLUGINS)/platforms"
-  wayland_plugins="$(find "$platforms_dir" -maxdepth 1 -name 'libqwayland*.so' -printf '%f;' 2>/dev/null || true)"
+  qt_plugins_dir="$("$qmake_bin" -query QT_INSTALL_PLUGINS)"
+  wayland_plugins="$(find "$qt_plugins_dir/platforms" -maxdepth 1 -name 'libqwayland*.so' -printf '%f;' 2>/dev/null || true)"
   if [ -n "$wayland_plugins" ]; then
     export EXTRA_PLATFORM_PLUGINS="${wayland_plugins%;}"
     echo "Bundling Wayland platform plugins: $EXTRA_PLATFORM_PLUGINS"
@@ -80,7 +81,27 @@ PATH="$tools_dir:$PATH" "$tools_dir/linuxdeploy" \
   --executable "$appdir/usr/bin/$(basename "$exe")" \
   --desktop-file "$workdir/vcdplayer.desktop" \
   --icon-file "$repo_root/img/icon/256.png" \
-  --plugin qt \
+  --plugin qt
+
+# linuxdeploy-plugin-qt deploys the Wayland shell-integration and
+# decoration plugins but not wayland-graphics-integration-client, which
+# holds the wayland-egl buffer integration: without it Qt logs 'Failed to
+# load client buffer integration: "wayland-egl"' and has no OpenGL on
+# Wayland (breaking the Hardware/OpenGL render backend there). Copy it in
+# by hand, then let linuxdeploy resolve its dependencies and fix its rpath
+# in the same run that produces the AppImage.
+deps_only=()
+graphics_dir="$qt_plugins_dir/wayland-graphics-integration-client"
+if [ -n "${EXTRA_PLATFORM_PLUGINS:-}" ] && [ -d "$graphics_dir" ]; then
+  mkdir -p "$appdir/usr/plugins"
+  cp -r "$graphics_dir" "$appdir/usr/plugins/"
+  deps_only=(--deploy-deps-only "$appdir/usr/plugins/wayland-graphics-integration-client")
+  echo "Bundling Wayland graphics integration: $(find "$graphics_dir" -name '*.so' -printf '%f ')"
+fi
+
+PATH="$tools_dir:$PATH" "$tools_dir/linuxdeploy" \
+  --appdir "$appdir" \
+  "${deps_only[@]}" \
   --output appimage
 cd - >/dev/null
 
