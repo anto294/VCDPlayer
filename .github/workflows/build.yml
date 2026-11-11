@@ -42,10 +42,10 @@ jobs:
     steps:
       - id: set
         run: |
-          windows='[{"arch":"x64","msystem":"MINGW64","os":"windows-2025"}]'
+          windows='[{"arch":"x64","msystem":"UCRT64","os":"windows-2025"}]'
           linux='[{"arch":"x86_64","appimage_arch":"x86_64","os":"ubuntu-24.04"}]'
           if [ "${{ github.event_name }}" != "pull_request" ]; then
-            windows='[{"arch":"x64","msystem":"MINGW64","os":"windows-2025"},{"arch":"arm64","msystem":"CLANGARM64","os":"windows-11-arm"}]'
+            windows='[{"arch":"x64","msystem":"UCRT64","os":"windows-2025"},{"arch":"arm64","msystem":"CLANGARM64","os":"windows-11-arm"}]'
             linux='[{"arch":"x86_64","appimage_arch":"x86_64","os":"ubuntu-24.04"},{"arch":"arm64","appimage_arch":"aarch64","os":"ubuntu-24.04-arm"}]'
           fi
           echo "windows=$windows" >> "$GITHUB_OUTPUT"
@@ -187,7 +187,11 @@ jobs:
     # Homebrew and CMakeLists.txt makes no Windows/Linux-only assumptions —
     # this job is what actually backs that claim instead of just asserting it.
     name: macOS (build only)
-    runs-on: macos-14
+    # Floating label on purpose: this job only checks that the code still
+    # builds on current macOS + Homebrew, so following GitHub's newest image
+    # is the point — and a pinned version (as macos-14 was) eventually gets
+    # retired and the job stops running at all.
+    runs-on: macos-latest
     timeout-minutes: 20
     steps:
       - uses: actions/checkout@v7

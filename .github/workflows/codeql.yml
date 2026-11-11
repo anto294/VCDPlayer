@@ -1,0 +1,57 @@
+name: CodeQL
+
+on:
+  push:
+    branches: [master]
+  pull_request:
+  # Weekly re-scan of master even without new commits: CodeQL's query packs
+  # keep gaining new checks, so an unchanged codebase can still surface
+  # fresh findings.
+  schedule:
+    - cron: "27 3 * * 1"
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  analyze:
+    name: Analyze (C++)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    permissions:
+      contents: read
+      # Required to upload results to the repo's Security > Code scanning tab.
+      security-events: write
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Install build dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            build-essential cmake ninja-build pkg-config \
+            qt6-base-dev qt6-tools-dev qt6-l10n-tools libmpv-dev
+
+      # Manual build mode: CodeQL extracts C++ by watching the real compiler
+      # invocations, so it needs to see an actual build, same deps as the
+      # Linux job in build.yml (no ccache here: a cache hit would skip the
+      # compiler call CodeQL needs to observe).
+      - uses: github/codeql-action/init@v4
+        with:
+          languages: c-cpp
+          build-mode: manual
+          queries: security-and-quality
+
+      - name: Build
+        run: |
+          cmake -S . -B build -G Ninja -DCMAKE_BUILD_TYPE=Debug
+          cmake --build build
+
+      - uses: github/codeql-action/analyze@v4
+        with:
+          category: /language:c-cpp

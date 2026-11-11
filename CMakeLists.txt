@@ -43,7 +43,7 @@ target_link_libraries(VCDPlayer PRIVATE Qt6::Widgets Qt6::OpenGL)
 # - Linux/macOS: a system libmpv (distro package, Homebrew, ...) is the
 #   normal way to get it, and it's discoverable via pkg-config.
 # - Windows: MSYS2 packages mpv with a pkg-config file too (see README.md),
-#   so this also covers a MINGW64/CLANGARM64 shell. Plain MSVC has no
+#   so this also covers a UCRT64/CLANGARM64 shell. Plain MSVC has no
 #   pkg-config, so it falls back to a source checkout + local meson build
 #   under vendor/mpv-src instead — also the fallback on any platform where
 #   pkg-config can't find a system libmpv.

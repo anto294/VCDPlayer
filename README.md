@@ -2,6 +2,7 @@
 
 [![Build](https://github.com/anto294/VCDPlayer/actions/workflows/build.yml/badge.svg)](https://github.com/anto294/VCDPlayer/actions/workflows/build.yml)
 [![Lint](https://github.com/anto294/VCDPlayer/actions/workflows/lint.yml/badge.svg)](https://github.com/anto294/VCDPlayer/actions/workflows/lint.yml)
+[![CodeQL](https://github.com/anto294/VCDPlayer/actions/workflows/codeql.yml/badge.svg)](https://github.com/anto294/VCDPlayer/actions/workflows/codeql.yml)
 
 A cross-platform desktop player for Video CDs (VCD), built with Qt6 and
 [libmpv](https://mpv.io/). Windows and Linux are built, packaged and tested
@@ -57,12 +58,12 @@ brew install mpv
 ```
 
 **Windows**: the tested setup (same as CI) is [MSYS2](https://www.msys2.org/),
-which packages mpv for both MINGW64 (x64) and CLANGARM64 (arm64) with a
+which packages mpv for both UCRT64 (x64) and CLANGARM64 (arm64) with a
 `pkg-config` file, so CMake finds it the same way it does on Linux/macOS:
 
 ```sh
-# from an MSYS2 MINGW64 or CLANGARM64 shell
-pacman -S mingw-w64-x86_64-mpv mingw-w64-x86_64-pkgconf   # MINGW64 (x64)
+# from an MSYS2 UCRT64 or CLANGARM64 shell
+pacman -S mingw-w64-ucrt-x86_64-mpv mingw-w64-ucrt-x86_64-pkgconf   # UCRT64 (x64)
 pacman -S mingw-w64-clang-aarch64-mpv mingw-w64-clang-aarch64-pkgconf  # CLANGARM64 (arm64)
 ```
 
@@ -113,8 +114,11 @@ typically copyrighted commercial discs.
 ## Contributing
 
 Code style is enforced by [.clang-format](.clang-format) and
-[.clang-tidy](.clang-tidy); the **Lint** workflow checks both on every PR. To
-run them locally:
+[.clang-tidy](.clang-tidy); the **Lint** workflow checks both on every PR
+(plus shellcheck on the `ci/` scripts and actionlint on the workflows).
+**CodeQL** runs a security analysis of every PR, and when the repository has
+an `ANTHROPIC_API_KEY` secret the **Review** workflow also posts an automated
+code review. To run the style checks locally:
 
 ```sh
 find src -name '*.cpp' -o -name '*.h' | xargs clang-format -i

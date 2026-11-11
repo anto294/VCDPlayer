@@ -1,0 +1,66 @@
+name: Review
+
+on:
+  pull_request:
+    types: [opened, synchronize, ready_for_review, reopened]
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  claude-review:
+    name: Claude code review
+    # Drafts aren't ready for review yet; they get one once marked ready.
+    if: ${{ !github.event.pull_request.draft }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    permissions:
+      contents: read
+      pull-requests: write
+      id-token: write
+    steps:
+      # Secrets aren't exposed to PRs from forks or Dependabot, and the repo
+      # may not have the key configured at all: skip cleanly instead of
+      # failing the check in all of those cases.
+      - name: Check for API key
+        id: key
+        env:
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+        run: |
+          if [ -n "$ANTHROPIC_API_KEY" ]; then
+            echo "present=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "present=false" >> "$GITHUB_OUTPUT"
+            echo "::notice::ANTHROPIC_API_KEY not available, skipping automated review."
+          fi
+
+      - uses: actions/checkout@v7
+        if: steps.key.outputs.present == 'true'
+        with:
+          fetch-depth: 0
+
+      - uses: anthropics/claude-code-action@v1
+        if: steps.key.outputs.present == 'true'
+        with:
+          anthropic_api_key: ${{ secrets.ANTHROPIC_API_KEY }}
+          prompt: |
+            REPO: ${{ github.repository }}
+            PR NUMBER: ${{ github.event.pull_request.number }}
+
+            Review this pull request. The project is a Qt6 + libmpv Video CD
+            player in C++17; src/core/ parses untrusted .cue/.bin disc
+            images, so pay particular attention there to bounds checks,
+            integer overflow and malformed input handling. Also look for
+            Qt object lifetime / thread-affinity mistakes and mpv API misuse.
+
+            Formatting and clang-tidy are already enforced by the Lint
+            workflow: don't comment on style. Only report real problems,
+            as inline comments on the relevant lines, plus one short
+            summary comment. If you find nothing worth flagging, say so in
+            one line.
+          claude_args: >-
+            --allowedTools "mcp__github_inline_comment__create_inline_comment,Bash(gh pr comment:*),Bash(gh pr diff:*),Bash(gh pr view:*)"
