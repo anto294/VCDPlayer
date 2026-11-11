@@ -234,10 +234,14 @@ void MpvPlayer::renderOpenGl(void* pixels, int width, int height, size_t stride)
   fbo.fbo = static_cast<int>(glFbo_->handle());
   fbo.w = width;
   fbo.h = height;
-  // FLIP_Y=1 makes mpv render top-down into the FBO; combined with
-  // glReadPixels' own bottom-up convention below, the two flips cancel out
-  // and pixels lands right-side up without an extra copy/mirror pass.
-  int flipY = 1;
+  // FLIP_Y must stay 0 here. mpv's "normal" (unflipped) rendering into an
+  // FBO puts the image's top row at GL row 0, and glReadPixels below also
+  // reads starting from GL row 0 — so `pixels` comes out top row first,
+  // exactly what QImage expects. FLIP_Y=1 is only meant for drawing
+  // straight to a window's default framebuffer (fbo 0), whose on-screen
+  // origin is bottom-left; using it with this offscreen FBO + readback
+  // showed every video upside down.
+  int flipY = 0;
   mpv_render_param params[] = {
       {MPV_RENDER_PARAM_OPENGL_FBO, &fbo},
       {MPV_RENDER_PARAM_FLIP_Y, &flipY},
