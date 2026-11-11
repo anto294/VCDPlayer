@@ -11,6 +11,16 @@ Notable changes to VCD Player, release by release. Format loosely follows
   shellcheck for the `ci/` packaging scripts, and an optional automated
   PR review workflow (enabled by an `ANTHROPIC_API_KEY` secret).
 
+### Fixed
+
+- Linux/macOS: crash at startup (`mpv_create() failed`) on systems with a
+  non-English locale that uses a decimal comma (Italian, German, French,
+  ...).
+- Linux AppImage: now runs natively on Wayland, with OpenGL, instead of
+  falling back to XWayland.
+- CI: macOS build moved off GitHub's retired `macos-14` runner; Windows x64
+  build moved to MSYS2 UCRT64, since MSYS2 no longer ships mpv for MINGW64.
+
 ## [v0.1.0-alpha] - 2026-08-26
 
 ### Added
