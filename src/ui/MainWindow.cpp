@@ -290,6 +290,17 @@ MainWindow::MainWindow(QWidget* parent) : QMainWindow(parent) {
 }
 
 void MainWindow::buildMenuBar() {
+  buildFileMenu();
+  buildPlaybackMenu();
+  buildAudioMenu();
+  buildViewMenu();
+  buildLanguageMenu();
+  buildAdvancedMenu();
+  buildExperimentalMenu();
+  buildInfoMenu();
+}
+
+void MainWindow::buildFileMenu() {
   auto* fileMenu = menuBar()->addMenu(tr("&File"));
   QAction* openAction = fileMenu->addAction(tr("Open disc…"));
   openAction->setShortcut(QKeySequence(QStringLiteral("Ctrl+O")));
@@ -297,7 +308,9 @@ void MainWindow::buildMenuBar() {
   fileMenu->addSeparator();
   QAction* quitAction = fileMenu->addAction(tr("Exit"));
   connect(quitAction, &QAction::triggered, this, &MainWindow::close);
+}
 
+void MainWindow::buildPlaybackMenu() {
   auto* playbackMenu = menuBar()->addMenu(tr("&Playback"));
   QAction* playAction = playbackMenu->addAction(tr("Play"));
   playAction->setShortcut(QKeySequence(Qt::Key_Space));
@@ -316,7 +329,9 @@ void MainWindow::buildMenuBar() {
   QAction* menuAction = playbackMenu->addAction(tr("Disc menu"));
   menuAction->setShortcut(QKeySequence(QStringLiteral("Ctrl+Alt+Up")));
   connect(menuAction, &QAction::triggered, this, [this]() { sendRemoteButton(vcd::RemoteButton::Return); });
+}
 
+void MainWindow::buildAudioMenu() {
   auto* audioMenu = menuBar()->addMenu(tr("&Audio"));
   QAction* volUpAction = audioMenu->addAction(tr("Volume up"));
   volUpAction->setShortcut(QKeySequence(QStringLiteral("Ctrl+Up")));
@@ -335,7 +350,9 @@ void MainWindow::buildMenuBar() {
   muteAction_->setCheckable(true);
   muteAction_->setShortcut(QKeySequence(QStringLiteral("M")));
   connect(muteAction_, &QAction::triggered, this, &MainWindow::toggleMute);
+}
 
+void MainWindow::buildViewMenu() {
   auto* viewMenu = menuBar()->addMenu(tr("&View"));
   QAction* screenshotAction = viewMenu->addAction(tr("Take screenshot"));
   screenshotAction->setShortcut(QKeySequence(QStringLiteral("Ctrl+S")));
@@ -371,7 +388,9 @@ void MainWindow::buildMenuBar() {
   showRemoteAction_->setCheckable(true);
   showRemoteAction_->setChecked(true);
   connect(showRemoteAction_, &QAction::triggered, this, &MainWindow::toggleRemotePanel);
+}
 
+void MainWindow::buildLanguageMenu() {
   auto* languageMenu = menuBar()->addMenu(tr("&Language"));
   auto* languageGroup = new QActionGroup(languageMenu);
   languageGroup->setExclusive(true);
@@ -385,7 +404,9 @@ void MainWindow::buildMenuBar() {
   italianAction->setChecked(currentLanguage_ == QStringLiteral("it"));
   languageGroup->addAction(italianAction);
   connect(italianAction, &QAction::triggered, this, [this]() { setLanguage(QStringLiteral("it")); });
+}
 
+void MainWindow::buildAdvancedMenu() {
   auto* advancedMenu = menuBar()->addMenu(tr("&Advanced"));
   auto* renderingMenu = advancedMenu->addMenu(tr("Rendering"));
   auto* renderingGroup = new QActionGroup(renderingMenu);
@@ -405,7 +426,9 @@ void MainWindow::buildMenuBar() {
   renderHwAction->setChecked(renderBackendSetting_ == QStringLiteral("hardware"));
   renderingGroup->addAction(renderHwAction);
   connect(renderHwAction, &QAction::triggered, this, [this]() { setRenderBackendSetting(QStringLiteral("hardware")); });
+}
 
+void MainWindow::buildExperimentalMenu() {
   auto* experimentalMenu = menuBar()->addMenu(tr("&Experimental"));
   aiUpscalingAction_ = experimentalMenu->addAction(tr("AI upscaling (Anime4K, GPU)"));
   aiUpscalingAction_->setCheckable(true);
@@ -415,7 +438,9 @@ void MainWindow::buildMenuBar() {
   cpuUpscalingAction_->setCheckable(true);
   cpuUpscalingAction_->setChecked(cpuUpscalingEnabled_);
   connect(cpuUpscalingAction_, &QAction::triggered, this, &MainWindow::setCpuUpscalingEnabled);
+}
 
+void MainWindow::buildInfoMenu() {
   auto* infoMenu = menuBar()->addMenu(tr("&Info"));
   QAction* aboutAction = infoMenu->addAction(tr("About VCD Player"));
   connect(aboutAction, &QAction::triggered, this, &MainWindow::showAboutDialog);

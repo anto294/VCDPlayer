@@ -47,6 +47,14 @@ class MainWindow : public QMainWindow {
   enum class ZoomDirection { In, Out, Reset };
 
   void buildMenuBar();
+  void buildFileMenu();
+  void buildPlaybackMenu();
+  void buildAudioMenu();
+  void buildViewMenu();
+  void buildLanguageMenu();
+  void buildAdvancedMenu();
+  void buildExperimentalMenu();
+  void buildInfoMenu();
   QMenu* buildContextMenu();
   void showContextMenuAt(const QPoint& globalPos);
 
