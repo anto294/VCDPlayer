@@ -36,6 +36,15 @@ std::string trackFileName(int trackNumber) {
 LoadedDisc loadDisc(const std::string& cuePath) {
   LoadedDisc out;
   out.disc = parseCue(cuePath);
+  // Every reader below assumes raw 2352-byte sectors (sync + header +
+  // subheader + payload). A MODE2/2336 or MODE1/2048 image would still
+  // "load" and then stream garbage, so refuse it up front instead.
+  for (const Track& t : out.disc.tracks) {
+    if (t.sectorSize != kSectorSize) {
+      throw std::runtime_error("Track " + std::to_string(t.number) + " uses " + t.mode +
+                               ": only raw 2352-byte sector images (MODE2/2352) are supported.");
+    }
+  }
   const int64_t trackStartLba = dataTrackStartLba(out.disc);
 
   CdxaReader fsReader = CdxaReader::open(out.disc.binPath);
