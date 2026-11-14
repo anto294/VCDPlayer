@@ -3,7 +3,9 @@
 // parsers were bounds-checked; run the suite under ASan to keep it that way.
 
 #include "Cdxa.h"
+#include "DiscBuilder.h"
 #include "Iso9660.h"
+#include "MpegTiming.h"
 #include "TestSupport.h"
 #include "VcdMeta.h"
 
@@ -62,4 +64,32 @@ TEST(read_past_end_of_image) {
   vcd::CdxaReader reader = vcd::CdxaReader::open(dir.file("d.bin"));
   CHECK_DISC_ERROR(reader.readForm2Range(10, 100000), DiscError::Code::CorruptImage);
   CHECK_EQ(reader.readForm2Range(10, 10).size(), size_t{10 * vcd::kForm2DataSize});
+}
+
+TEST(mpeg_pack_clock) {
+  // MPEG-1 pack header with SCR 2^32 + 90000 (bit 32 set), after junk.
+  uint8_t mpeg1[13] = {0xff};
+  test::SyntheticVcd::putMpeg1Pack(mpeg1 + 1, (uint64_t{1} << 32) + 90000);
+  const auto scr1 = vcd::firstPackScr(mpeg1, sizeof(mpeg1));
+  CHECK(scr1.has_value());
+  CHECK_EQ(*scr1, (4294967296.0 + 90000.0) / 90000.0);
+  // MPEG-2 pack header, SCR base 90000 * 3.
+  const uint64_t base = 270000;
+  const uint8_t mpeg2[] = {0x00,
+                           0x00,
+                           0x01,
+                           0xBA,
+                           static_cast<uint8_t>(0x44 | ((base >> 27) & 0x38) | ((base >> 28) & 0x03)),
+                           static_cast<uint8_t>(base >> 20),
+                           static_cast<uint8_t>(((base >> 12) & 0xF8) | 0x04 | ((base >> 13) & 0x03)),
+                           static_cast<uint8_t>(base >> 5),
+                           static_cast<uint8_t>(((base << 3) & 0xF8) | 0x04),
+                           0x01};
+  const auto scr2 = vcd::firstPackScr(mpeg2, sizeof(mpeg2));
+  CHECK(scr2.has_value());
+  CHECK_EQ(*scr2, 3.0);
+  // No pack, or one cut short by the end of the buffer.
+  CHECK(!vcd::firstPackScr(mpeg1, 9).has_value());
+  const uint8_t none[] = {0x00, 0x00, 0x01, 0xB3, 0x21, 0, 1, 0, 1, 0, 0};
+  CHECK(!vcd::firstPackScr(none, sizeof(none)).has_value());
 }

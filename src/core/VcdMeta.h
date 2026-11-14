@@ -47,6 +47,9 @@ struct EntriesEntry {
   int ss = 0;
   int ff = 0;
   int64_t isoLba = 0;
+  // Where the entry starts in its track's playback time, from the MPEG
+  // timestamps (filled in by loadDisc()); -1 if unknown.
+  double trackSeconds = -1;
 };
 
 struct EntriesFile {

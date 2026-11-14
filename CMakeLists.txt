@@ -17,6 +17,7 @@ add_library(vcdcore STATIC
     src/core/VcdMeta.cpp
     src/core/PbcEngine.cpp
     src/core/DiscLoader.cpp
+    src/core/MpegTiming.cpp
 )
 target_include_directories(vcdcore PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/src/core)
 

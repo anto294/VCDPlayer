@@ -7,6 +7,7 @@
 #include "Cdxa.h"
 #include "DiscError.h"
 #include "Iso9660.h"
+#include "MpegTiming.h"
 
 namespace vcd {
 
@@ -76,6 +77,20 @@ LoadedDisc loadDisc(const std::string& cuePath) {
     if (!entry) continue;
     const int64_t sectorCount = (entry->length + kForm1DataSize - 1) / kForm1DataSize;
     out.trackStreams[t.number] = StreamRef{entry->lba, sectorCount};
+  }
+
+  // Real playback times, from the MPEG timestamps: each track's length, and
+  // where each chapter (ENTRIES.VCD entry) starts within its track.
+  for (auto& [number, stream] : out.trackStreams) {
+    const std::optional<double> start = scrNear(fsReader, stream, stream.lba);
+    const std::optional<double> end = scrNear(fsReader, stream, stream.lba + stream.sectorCount - 1, true);
+    if (start && end && *end > *start) stream.seconds = *end - *start;
+    for (EntriesEntry& e : out.entriesFile.entries) {
+      if (e.track != number || !start) continue;
+      if (e.isoLba < stream.lba || e.isoLba >= stream.lba + stream.sectorCount) continue;
+      const std::optional<double> at = scrNear(fsReader, stream, e.isoLba);
+      if (at && *at >= *start) e.trackSeconds = *at - *start;
+    }
   }
 
   const std::optional<DirEntry> segmentDir = resolvePath(fsReader, pvd.root, "SEGMENT");

@@ -31,6 +31,10 @@ void checkSyntheticDisc(const vcd::LoadedDisc& disc) {
   CHECK_EQ(disc.entriesFile.entries.size(), size_t{2});
   CHECK_EQ(disc.entriesFile.entries[1].isoLba, int64_t{SyntheticVcd::kVideoIsoLba + SyntheticVcd::kChapterOffset});
   CHECK_EQ(readHeaderIso(disc.image, disc.entriesFile.entries[1].isoLba), disc.entriesFile.entries[1].isoLba);
+  // Playback times from the MPEG pack clocks (see SyntheticVcd).
+  CHECK_EQ(video.seconds, (SyntheticVcd::kVideoSectors - 1) * 0.5);
+  CHECK_EQ(disc.entriesFile.entries[0].trackSeconds, 0.0);
+  CHECK_EQ(disc.entriesFile.entries[1].trackSeconds, SyntheticVcd::kChapterOffset * 0.5);
 }
 
 }  // namespace

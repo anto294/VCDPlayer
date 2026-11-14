@@ -64,6 +64,23 @@ struct SyntheticVcd {
     putBe16(entries + 0x0a, 2);
     writeEntry(entries + 0x0c, 2, kVideoIsoLba);
     writeEntry(entries + 0x10, 2, kVideoIsoLba + kChapterOffset);
+
+    // Video sectors: an MPEG-1 pack each, the clock starting at 5 s and
+    // advancing 0.5 s per sector, so the track lasts (n-1)*0.5 s and the
+    // chapter starts kChapterOffset*0.5 s in.
+    for (int i = 0; i < kVideoSectors; i++) putMpeg1Pack(image.form1Payload(kTrack1Sectors + i), 450000 + i * 45000);
+  }
+
+  static void putMpeg1Pack(uint8_t* p, uint64_t scr) {
+    p[0] = 0;
+    p[1] = 0;
+    p[2] = 1;
+    p[3] = 0xBA;
+    p[4] = static_cast<uint8_t>(0x21 | ((scr >> 29) & 0x0E));
+    p[5] = static_cast<uint8_t>(scr >> 22);
+    p[6] = static_cast<uint8_t>(((scr >> 14) & 0xFE) | 1);
+    p[7] = static_cast<uint8_t>(scr >> 7);
+    p[8] = static_cast<uint8_t>(((scr << 1) & 0xFE) | 1);
   }
 
   // Single .bin with a PREGAP'd track 2.

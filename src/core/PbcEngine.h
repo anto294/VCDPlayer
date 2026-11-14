@@ -16,6 +16,9 @@ namespace vcd {
 struct StreamRef {
   int64_t lba = 0;
   int64_t sectorCount = 0;
+  // Playback length from the stream's MPEG timestamps (see MpegTiming.h),
+  // -1 if unknown. Only set for video tracks.
+  double seconds = -1;
 };
 
 // Abstracts mpv away from PbcEngine, so the PBC state machine stays

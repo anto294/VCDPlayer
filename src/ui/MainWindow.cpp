@@ -496,13 +496,14 @@ void MainWindow::fillChapterMenu(QMenu* menu) {
   const std::vector<vcd::EntriesEntry>& entries = disc->entriesFile.entries;
   for (size_t i = 0; i < entries.size(); i++) {
     const vcd::EntriesEntry& entry = entries[i];
-    // Where the chapter starts within its video track: CD sectors play at
-    // 75 per second. CD track 1 is the data track, so video track n is CD
-    // track n+1 (MPEGAV/AVSEQ0n.DAT).
-    const auto track = disc->trackStreams.find(entry.track);
-    const double offset = track == disc->trackStreams.end() ? 0.0 : (entry.isoLba - track->second.lba) / 75.0;
-    QAction* action = menu->addAction(
-        tr("Chapter %1  (track %2, %3)").arg(i + 1).arg(entry.track - 1).arg(formatTime(std::max(0.0, offset))));
+    // CD track 1 is the data track, so video track n is CD track n+1
+    // (MPEGAV/AVSEQ0n.DAT). The start time comes from the MPEG timestamps
+    // and is left out when they couldn't be read.
+    const QString label =
+        entry.trackSeconds >= 0
+            ? tr("Chapter %1  (track %2, %3)").arg(i + 1).arg(entry.track - 1).arg(formatTime(entry.trackSeconds))
+            : tr("Chapter %1  (track %2)").arg(i + 1).arg(entry.track - 1);
+    QAction* action = menu->addAction(label);
     const int index = static_cast<int>(i);
     connect(action, &QAction::triggered, this, [this, index]() { session_->jumpToChapter(index); });
   }

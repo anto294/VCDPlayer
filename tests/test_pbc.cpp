@@ -121,7 +121,10 @@ std::map<int, vcd::StreamRef> tracks() {
 // Chapters: track 2 at its start and 4 sectors in, track 3 at its start.
 vcd::EntriesFile entries() {
   vcd::EntriesFile e;
-  e.entries = {{.track = 2, .isoLba = 2000}, {.track = 2, .isoLba = 2004}, {.track = 3, .isoLba = 3000}};
+  // The first two have known start times, the last one doesn't.
+  e.entries = {{.track = 2, .isoLba = 2000, .trackSeconds = 0},
+               {.track = 2, .isoLba = 2004, .trackSeconds = 2.5},
+               {.track = 3, .isoLba = 3004}};
   return e;
 }
 
@@ -320,10 +323,15 @@ TEST(jump_to_entry_leaves_pbc_and_return_goes_back_to_menu) {
   Engine e(b);
   e.engine.start();
   CHECK(e.engine.state().kind == Kind::Menu);
-  e.engine.jumpToEntry(1);  // whole track 2, started 4 sectors in
+  e.engine.jumpToEntry(1);  // whole track 2, started at the chapter's time
   CHECK_EQ(e.host.lastLba, 2000);
   CHECK_EQ(e.host.lastSectors, 10);
-  CHECK_EQ(e.host.lastStart, 4 / 75.0);
+  CHECK_EQ(e.host.lastStart, 2.5);
+  e.engine.jumpToEntry(2);  // time unknown: the stream starts at its sector
+  CHECK_EQ(e.host.lastLba, 3004);
+  CHECK_EQ(e.host.lastSectors, 6);
+  CHECK_EQ(e.host.lastStart, 0.0);
+  e.engine.jumpToEntry(1);
   CHECK(e.engine.state().kind == Kind::Playing);
   e.engine.onEof();  // carries on with the next track
   CHECK_EQ(e.host.lastTrack(), 3);
