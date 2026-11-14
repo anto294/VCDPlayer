@@ -22,6 +22,7 @@ bool PbcEngine::pbcAvailable() const { return !lot_.empty() && !psd_.empty(); }
 void PbcEngine::start() {
   ended_ = false;
   stopped_ = false;
+  immediateJumps_ = 0;
   currentDescriptor_.reset();
   plainTrack_.reset();
   if (pbcAvailable()) {
@@ -103,7 +104,7 @@ void PbcEngine::playNextPlaylistItem() {
   if (!waitMs || d.nextOfs.kind != PsdOfs::Kind::Offset) return;
   const int64_t offset = d.nextOfs.byteOffset;
   if (*waitMs == 0) {
-    goTo(offset);
+    jumpImmediately(offset);
   } else {
     timerHost_->scheduleTimeout(TimerId::Navigation, *waitMs, [this, offset]() { goTo(offset); });
   }
@@ -125,16 +126,30 @@ void PbcEngine::startSelectionWait() {
 
   const int64_t offset = target.byteOffset;
   if (*waitMs == 0) {
-    goTo(offset);
+    jumpImmediately(offset);
   } else {
     timerHost_->scheduleTimeout(TimerId::Navigation, *waitMs, [this, offset]() { goTo(offset); });
   }
+}
+
+void PbcEngine::jumpImmediately(int64_t byteOffset) {
+  // A zero wait jumps synchronously, so a loop of nodes that have nothing
+  // to play (item missing, or a playlist of unresolvable items) would
+  // recurse until the stack overflows. Real discs chain at most a few such
+  // nodes; anything longer is a cycle, and the disc ends there.
+  constexpr int kMaxImmediateJumps = 64;
+  if (++immediateJumps_ > kMaxImmediateJumps) {
+    end();
+    return;
+  }
+  goTo(byteOffset);
 }
 
 bool PbcEngine::playItemRef(const ItemRef& itemRef) {
   if (itemRef.kind == ItemRef::Kind::Track) {
     const auto it = trackStreams_.find(itemRef.track);
     if (it == trackStreams_.end()) return false;
+    immediateJumps_ = 0;
     sink_->loadAndPlay(it->second.lba, it->second.sectorCount);
     sink_->play();
     return true;
@@ -143,6 +158,7 @@ bool PbcEngine::playItemRef(const ItemRef& itemRef) {
   if (itemRef.kind == ItemRef::Kind::Segment) {
     const auto it = segmentStreams_.find(itemRef.segmentNumber);
     if (it == segmentStreams_.end()) return false;
+    immediateJumps_ = 0;
     sink_->loadAndPlay(it->second.lba, it->second.sectorCount);
     sink_->play();
     return true;
@@ -154,6 +170,7 @@ bool PbcEngine::playItemRef(const ItemRef& itemRef) {
     const auto it = trackStreams_.find(entry.track);
     if (it == trackStreams_.end()) return false;
     const int64_t startSector = std::max<int64_t>(0, entry.isoLba - it->second.lba);
+    immediateJumps_ = 0;
     sink_->loadAndPlay(it->second.lba + startSector, it->second.sectorCount - startSector);
     sink_->play();
     return true;
@@ -194,6 +211,7 @@ void PbcEngine::onEof() {
 }
 
 void PbcEngine::onRemoteButton(RemoteButton btn, int number) {
+  immediateJumps_ = 0;  // a key press starts a new chain of jumps
   const std::optional<PsdDescriptor>& d = currentDescriptor_;
   if (btn == RemoteButton::Number) {
     if (!d || d->type != PsdType::Selection || d->choices.empty() || number < 0 || number > 9) return;

@@ -246,3 +246,35 @@ TEST(corrupt_psd_offset_ends_disc_without_throwing) {
   e.engine.start();
   CHECK(e.engine.state().kind == Kind::End);
 }
+
+TEST(zero_wait_cycle_without_playable_items_ends_the_disc) {
+  // Corrupt PSD: a selection with nothing to play and totime 0 that times
+  // out to itself, and a playlist of unresolvable items with wait 0 whose
+  // next is itself. Both used to recurse until the stack overflowed.
+  PsdBuilder b;
+  b.selection(0, {.item = 0, .totime = 0, .timeout = PsdBuilder::slot(0)});
+  b.playlist(1, {.items = {99}, .wait = 0, .next = PsdBuilder::slot(1)});
+  Engine sel(b);
+  sel.engine.start();
+  CHECK(sel.engine.state().kind == Kind::End);
+
+  Engine list(b, PsdBuilder::lot(PsdBuilder::slot(1)));
+  list.engine.start();
+  CHECK(list.engine.state().kind == Kind::End);
+  // Play restarts it, and the cycle is detected again rather than the
+  // count carrying over.
+  list.engine.onRemoteButton(RemoteButton::Play);
+  CHECK(list.engine.state().kind == Kind::End);
+}
+
+TEST(short_zero_wait_chain_is_followed) {
+  // Two empty nodes chained with totime 0 before a real menu: fine.
+  PsdBuilder b;
+  b.selection(0, {.item = 0, .totime = 0, .timeout = PsdBuilder::slot(1)});
+  b.selection(1, {.item = 0, .totime = 0, .timeout = PsdBuilder::slot(2)});
+  b.selection(2, {.item = 5, .choices = {PsdBuilder::slot(0)}});
+  Engine e(b);
+  e.engine.start();
+  CHECK_EQ(e.host.lastTrack(), 5);
+  CHECK(e.engine.state().kind == Kind::Menu);
+}

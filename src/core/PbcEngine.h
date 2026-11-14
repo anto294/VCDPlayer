@@ -99,6 +99,9 @@ class PbcEngine {
   void end();
   // Selects the menu choice numbered pendingNumber_, if it exists.
   void commitTypedNumber();
+  // Follows a zero-wait jump taken without playing anything, ending the
+  // disc instead if such jumps keep chaining (a cycle in a corrupt PSD).
+  void jumpImmediately(int64_t byteOffset);
   void notify();
 
   VcdInfo info_;
@@ -117,6 +120,7 @@ class PbcEngine {
   int pendingNumber_ = -1;      // menu number typed so far (-1 = none)
   bool ended_ = false;
   bool stopped_ = false;
+  int immediateJumps_ = 0;  // zero-wait jumps since something last played
 };
 
 }  // namespace vcd
