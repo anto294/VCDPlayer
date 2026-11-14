@@ -16,6 +16,7 @@
 #include <QHBoxLayout>
 #include <QKeyEvent>
 #include <QLabel>
+#include <QLocale>
 #include <QMenu>
 #include <QMenuBar>
 #include <QMessageBox>
@@ -109,7 +110,12 @@ MainWindow::MainWindow(QWidget* parent) : QMainWindow(parent) {
   // Install the saved language's translator before building any widget, so
   // the very first buildMenuBar()/RemotePanel construction below already
   // produces the right-language text instead of flashing English first.
-  currentLanguage_ = QSettings().value(QStringLiteral("language"), QStringLiteral("en")).toString();
+  // First launch: follow the system language when we ship a translation
+  // for it (Italian), English otherwise. An explicit choice from the
+  // Language menu is saved and wins from then on.
+  const QString systemDefault =
+      QLocale::system().language() == QLocale::Italian ? QStringLiteral("it") : QStringLiteral("en");
+  currentLanguage_ = QSettings().value(QStringLiteral("language"), systemDefault).toString();
   if (currentLanguage_ != QStringLiteral("en")) {
     translator_ = new QTranslator(this);
     if (translator_->load(QStringLiteral(":/i18n/vcdplayer_%1.qm").arg(currentLanguage_))) {
