@@ -67,6 +67,10 @@ class MainWindow : public QMainWindow {
   void showContextMenuAt(const QPoint& globalPos);
 
   void openDiscDialog();
+  // File > Recent discs: the last kMaxRecentDiscs .cue files opened
+  // successfully, most recent first ("recentDiscs" setting).
+  void addRecentDisc(const QString& cuePath);
+  void fillRecentDiscsMenu(QMenu* menu);
   void sendRemoteButton(vcd::RemoteButton btn, int number = 0);
   // Space bar: Play if paused/stopped/ended, Pause if playing.
   void togglePlayPause();

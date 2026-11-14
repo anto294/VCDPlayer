@@ -53,6 +53,7 @@ constexpr int kWindowMargin = 24;
 constexpr int kLayoutSpacing = 10;
 constexpr int kPanelWidth = 224;      // remote panel column (its scroll area's fixed width)
 constexpr int kToggleRailWidth = 36;  // permanent slot for panelToggleButton_, see updateOverlayPositions()
+constexpr int kMaxRecentDiscs = 10;
 
 // mpv's software renderer defaults to zimg for the actual scale step
 // (sws-allow-zimg=yes by default) when it's compiled in, as it is here —
@@ -445,6 +446,11 @@ void MainWindow::buildFileMenu() {
   QAction* openAction = fileMenu->addAction(tr("Open disc…"));
   openAction->setShortcut(QKeySequence(QStringLiteral("Ctrl+O")));
   connect(openAction, &QAction::triggered, this, &MainWindow::openDiscDialog);
+  QMenu* recentMenu = fileMenu->addMenu(tr("Recent discs"));
+  recentMenu->setToolTipsVisible(true);
+  // Filled on every open, so it reflects discs opened since (and files
+  // deleted since) without rebuilding the menu bar.
+  connect(recentMenu, &QMenu::aboutToShow, this, [this, recentMenu]() { fillRecentDiscsMenu(recentMenu); });
   fileMenu->addSeparator();
   QAction* quitAction = fileMenu->addAction(tr("Exit"));
   connect(quitAction, &QAction::triggered, this, &MainWindow::close);
@@ -725,11 +731,60 @@ void MainWindow::openDiscDialog() {
   if (!path.isEmpty()) openDiscPath(path);
 }
 
+void MainWindow::addRecentDisc(const QString& cuePath) {
+  const QString path = QFileInfo(cuePath).absoluteFilePath();
+  QStringList recent = QSettings().value(QStringLiteral("recentDiscs")).toStringList();
+  recent.removeAll(path);
+  recent.prepend(path);
+  while (recent.size() > kMaxRecentDiscs) recent.removeLast();
+  QSettings().setValue(QStringLiteral("recentDiscs"), recent);
+}
+
+void MainWindow::fillRecentDiscsMenu(QMenu* menu) {
+  menu->clear();
+  QStringList recent = QSettings().value(QStringLiteral("recentDiscs")).toStringList();
+  // Discs since moved or deleted would only fail to open: drop them.
+  recent.erase(std::remove_if(recent.begin(), recent.end(), [](const QString& p) { return !QFileInfo::exists(p); }),
+               recent.end());
+  QSettings().setValue(QStringLiteral("recentDiscs"), recent);
+
+  if (recent.isEmpty()) {
+    menu->addAction(tr("No recent discs"))->setEnabled(false);
+    return;
+  }
+  for (int i = 0; i < recent.size(); i++) {
+    const QFileInfo info(recent[i]);
+    // Rips usually sit in a folder named after the disc, which says more
+    // than the .cue name does (I_ROTEO.CUE vs "I Roteo e la magia ...");
+    // the file name is added when that alone would be ambiguous.
+    const QString folder = info.dir().dirName();
+    const auto sameFolder = std::count_if(recent.begin(), recent.end(), [&info](const QString& p) {
+      return QFileInfo(p).absolutePath() == info.absolutePath();
+    });
+    QString name = folder;
+    if (folder.isEmpty()) {
+      name = info.fileName();
+    } else if (sameFolder > 1) {
+      name = QStringLiteral("%1 (%2)").arg(folder, info.fileName());
+    }
+    // Mnemonics 1-9 then 0, like a numeric keypad.
+    name.replace(QLatin1Char('&'), QStringLiteral("&&"));  // a literal '&', not a mnemonic
+    QAction* action = menu->addAction(QStringLiteral("&%1  %2").arg((i + 1) % 10).arg(name));
+    action->setToolTip(QDir::toNativeSeparators(recent[i]));
+    const QString path = recent[i];
+    connect(action, &QAction::triggered, this, [this, path]() { openDiscPath(path); });
+  }
+  menu->addSeparator();
+  connect(menu->addAction(tr("Clear list")), &QAction::triggered, this,
+          []() { QSettings().remove(QStringLiteral("recentDiscs")); });
+}
+
 void MainWindow::openDiscPath(const QString& cuePath) {
   remote_->setStatus(tr("Loading…"));
   QString error;
   if (session_->openDiscPath(cuePath, &error)) {
     currentDiscFileName_ = QFileInfo(cuePath).fileName();
+    addRecentDisc(cuePath);
   } else {
     currentDiscFileName_.clear();
     remote_->setStatus(QStringLiteral("—"));
