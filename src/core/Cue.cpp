@@ -1,5 +1,6 @@
 #include "Cue.h"
 
+#include <cctype>
 #include <filesystem>
 #include <fstream>
 #include <regex>
@@ -29,6 +30,32 @@ int sectorSizeFromMode(const std::string& mode) {
   std::smatch m;
   if (std::regex_search(mode, m, kModeRe)) return std::stoi(m[1]);
   return 2352;
+}
+
+std::string lowerAscii(std::string s) {
+  for (char& c : s) c = static_cast<char>(std::tolower(static_cast<unsigned char>(c)));
+  return s;
+}
+
+// The FILE directive's name as written is tried first. If it doesn't exist
+// — typically a sheet made on Windows, where "DISC.BIN" also opens
+// disc.bin, or one carrying the ripping machine's absolute path
+// ("C:\rips\disc.bin") — fall back to the bare file name, matched
+// case-insensitively, next to the .cue itself.
+std::string resolveBinPath(const fs::path& cueDir, const std::string& fileName) {
+  const fs::path direct = cueDir / fileName;
+  std::error_code ec;
+  if (fs::exists(direct, ec)) return direct.string();
+
+  const auto sep = fileName.find_last_of("/\\");
+  const std::string bareName = sep == std::string::npos ? fileName : fileName.substr(sep + 1);
+  const std::string wanted = lowerAscii(bareName);
+  for (const auto& entry : fs::directory_iterator(cueDir.empty() ? fs::path(".") : cueDir, ec)) {
+    if (entry.is_regular_file(ec) && lowerAscii(entry.path().filename().string()) == wanted) {
+      return entry.path().string();
+    }
+  }
+  return direct.string();  // not found: let the open fail with the name as written
 }
 
 std::string trim(const std::string& s) {
@@ -72,7 +99,7 @@ Disc parseCue(const std::string& cuePath) {
       if (!disc.binPath.empty()) {
         throw std::runtime_error("Only .cue files with a single FILE directive are supported.");
       }
-      disc.binPath = (fs::path(cuePath).parent_path() / m[1].str()).string();
+      disc.binPath = resolveBinPath(fs::path(cuePath).parent_path(), m[1].str());
       continue;
     }
     if (std::regex_search(line, m, kTrackRe)) {
