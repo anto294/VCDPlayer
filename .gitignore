@@ -6,3 +6,7 @@ samples/
 *.log
 bin/
 .claude/settings.local.json
+.flatpak-builder/
+flatpak-build/
+flatpak-repo/
+*.flatpak

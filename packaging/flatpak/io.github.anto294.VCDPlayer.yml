@@ -1,0 +1,119 @@
+# Flatpak manifest. Build locally (from the repo root) with:
+#   flatpak run org.flatpak.Builder --user --force-clean --install-deps-from=flathub \
+#     --repo=flatpak-repo flatpak-build packaging/flatpak/io.github.anto294.VCDPlayer.yml
+#   flatpak build-bundle flatpak-repo VCDPlayer.flatpak io.github.anto294.VCDPlayer
+# CI does the same, see .github/workflows/build.yml.
+id: io.github.anto294.VCDPlayer
+runtime: org.kde.Platform
+runtime-version: '6.11'
+sdk: org.kde.Sdk
+command: VCDPlayer
+finish-args:
+  - --share=ipc
+  - --socket=wayland
+  - --socket=fallback-x11
+  - --device=dri
+  - --socket=pulseaudio
+  # Disc images: a .cue names its .bin(s) next to it, which the file
+  # chooser portal (it grants just the picked file) wouldn't expose.
+  - --filesystem=home:ro
+  - --filesystem=/media:ro
+  - --filesystem=/run/media:ro
+  # Screenshots (View > Take screenshot).
+  - --filesystem=xdg-pictures/VCDPlayer:create
+  # MPRIS (media keys, the desktop's media widget), incl. extra instances.
+  - --own-name=org.mpris.MediaPlayer2.vcdplayer
+  - --own-name=org.mpris.MediaPlayer2.vcdplayer.*
+  # Screen kept on during playback; the portal is the fallback.
+  - --talk-name=org.freedesktop.ScreenSaver
+cleanup:
+  - /include
+  - /lib/pkgconfig
+  - /share/doc
+  - /share/man
+  - '*.a'
+  - '*.la'
+modules:
+  # libmpv and what it needs that the KDE runtime lacks. FFmpeg is cut
+  # down to what a Video CD and the app use: MPEG-1/2 video, MPEG audio,
+  # the MPEG program stream demuxer, PNG/JPEG for screenshots and the
+  # filters behind mpv's audio/video chains (pan: karaoke channels).
+  - name: ffmpeg
+    config-opts:
+      - --disable-static
+      - --enable-shared
+      - --disable-programs
+      - --disable-doc
+      - --disable-avdevice
+      - --disable-network
+      - --disable-everything
+      - --enable-decoder=mpeg1video,mpeg2video,mp1,mp1float,mp2,mp2float,mp3,mp3float,pcm_s16be,pcm_s16le,png,mjpeg
+      - --enable-encoder=png,mjpeg
+      - --enable-demuxer=mpegps,mpegvideo,mp3,image2
+      - --enable-parser=mpegvideo,mpegaudio,png,mjpeg
+      - --enable-protocol=file
+      - --enable-filter=abuffer,abuffersink,buffer,buffersink,aformat,format,aresample,anull,null,pan,scale,volume
+      - --enable-zlib
+    sources:
+      - type: archive
+        url: https://ffmpeg.org/releases/ffmpeg-7.1.1.tar.xz
+        sha256: 733984395e0dbbe5c046abda2dc49a5544e7e0e1e2366bba849222ae9e3a03b1
+
+  - name: libass
+    config-opts:
+      - --disable-static
+    sources:
+      - type: archive
+        url: https://github.com/libass/libass/releases/download/0.17.3/libass-0.17.3.tar.xz
+        sha256: eae425da50f0015c21f7b3a9c7262a910f0218af469e22e2931462fed3c50959
+
+  - name: libplacebo
+    buildsystem: meson
+    config-opts:
+      - -Dvulkan=disabled
+      - -Dopengl=disabled
+      - -Dd3d11=disabled
+      - -Dshaderc=disabled
+      - -Dglslang=disabled
+      - -Ddemos=false
+      - -Dtests=false
+    sources:
+      - type: git
+        url: https://code.videolan.org/videolan/libplacebo.git
+        tag: v7.360.1
+
+  - name: mpv
+    buildsystem: meson
+    config-opts:
+      - -Dlibmpv=true
+      - -Dcplayer=false
+      - -Dlua=disabled
+      - -Djavascript=disabled
+      - -Dmanpage-build=disabled
+      - -Dhtml-build=disabled
+      - -Dpdf-build=disabled
+      - -Dvulkan=disabled
+      - -Dlibarchive=disabled
+      - -Dcdda=disabled
+      - -Ddvdnav=disabled
+      - -Dlibbluray=disabled
+      - -Drubberband=disabled
+      - -Duchardet=disabled
+    sources:
+      - type: archive
+        url: https://github.com/mpv-player/mpv/archive/refs/tags/v0.40.0.tar.gz
+        sha256: 10a0f4654f62140a6dd4d380dcf0bbdbdcf6e697556863dc499c296182f081a3
+
+  - name: vcdplayer
+    buildsystem: cmake-ninja
+    config-opts:
+      - -DCMAKE_BUILD_TYPE=Release
+      - -DBUILD_TESTING=OFF
+    sources:
+      - type: dir
+        path: ../..
+        skip:
+          - build
+          - flatpak-build
+          - flatpak-repo
+          - .flatpak-builder

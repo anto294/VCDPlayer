@@ -213,6 +213,55 @@ jobs:
             dist/*.deb
           if-no-files-found: error
 
+  flatpak:
+    name: Flatpak (${{ matrix.arch }})
+    needs: matrix-config
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 60
+    strategy:
+      fail-fast: false
+      matrix:
+        include: ${{ fromJson(needs.matrix-config.outputs.linux) }}
+    steps:
+      - uses: actions/checkout@v7
+
+      # flatpak-builder sandboxes every build step with bubblewrap, which
+      # needs unprivileged user namespaces; Ubuntu 24.04's AppArmor policy
+      # restricts them by default.
+      - name: Install flatpak-builder
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y flatpak flatpak-builder
+          sudo sysctl -w kernel.apparmor_restrict_unprivileged_userns=0
+          flatpak remote-add --user --if-not-exists flathub https://dl.flathub.org/repo/flathub.flatpakrepo
+
+      # The dependency modules (FFmpeg, libass, libplacebo, mpv) only
+      # rebuild when the manifest changes.
+      - name: Cache flatpak-builder state
+        uses: actions/cache@v6
+        with:
+          path: .flatpak-builder
+          key: flatpak-builder-${{ matrix.arch }}-${{ hashFiles('packaging/flatpak/*.yml') }}-${{ github.run_id }}
+          restore-keys: |
+            flatpak-builder-${{ matrix.arch }}-${{ hashFiles('packaging/flatpak/*.yml') }}-
+
+      - name: Build
+        run: >-
+          flatpak-builder --user --force-clean --install-deps-from=flathub
+          --disable-rofiles-fuse --repo=flatpak-repo
+          flatpak-build packaging/flatpak/io.github.anto294.VCDPlayer.yml
+
+      - name: Bundle
+        run: |
+          mkdir -p dist
+          flatpak build-bundle flatpak-repo dist/VCDPlayer-linux-${{ matrix.arch }}.flatpak io.github.anto294.VCDPlayer
+
+      - uses: actions/upload-artifact@v7
+        with:
+          name: VCDPlayer-linux-${{ matrix.arch }}-flatpak
+          path: dist/*.flatpak
+          if-no-files-found: error
+
   macos:
     # Build-only sanity check, not part of the release: README says macOS
     # "should work but is untested" since Qt6 + mpv are both available via
@@ -254,7 +303,7 @@ jobs:
 
   release:
     name: Publish draft release
-    needs: [windows, linux-appimage]
+    needs: [windows, linux-appimage, flatpak]
     if: startsWith(github.ref, 'refs/tags/v')
     runs-on: ubuntu-24.04
     timeout-minutes: 10
