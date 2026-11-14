@@ -29,9 +29,8 @@ struct Disc {
   std::vector<Track> tracks;
 };
 
-// Parses a .cue file. Only supports .cue files with a single FILE directive
-// (VCDs extracted as multi-track .bin/.cue). Throws std::runtime_error on
-// malformed input.
+// Parses a .cue file: a single .bin holding every track, or one FILE per
+// track (or any mix). Throws std::runtime_error on malformed input.
 Disc parseCue(const std::string& cuePath);
 
 // Builds the map from the disc's ISO LBAs to positions in the image

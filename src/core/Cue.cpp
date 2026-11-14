@@ -96,9 +96,6 @@ Disc parseCue(const std::string& cuePath) {
 
     std::smatch m;
     if (std::regex_search(line, m, kFileRe)) {
-      if (!disc.files.empty()) {
-        throw std::runtime_error("Only .cue files with a single FILE directive are supported.");
-      }
       disc.files.push_back(resolveBinPath(fs::path(cuePath).parent_path(), m[1].str()));
       continue;
     }
