@@ -17,8 +17,7 @@ class QOpenGLFramebufferObject;
 // (libmpv render API — software or OpenGL, see initRenderContext() for how
 // the two differ and detectBestRenderBackend() for how one gets picked by
 // default), pumps mpv events into the Qt loop, and forwards commands.
-// Replaces the JSON-over-pipe IPC used in the Electron version — here
-// everything runs in-process, no external mpv.exe.
+// Everything runs in-process through libmpv: no external mpv executable.
 class MpvPlayer : public QObject {
   Q_OBJECT
 

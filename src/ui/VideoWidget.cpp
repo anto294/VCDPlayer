@@ -10,9 +10,9 @@
 VideoWidget::VideoWidget(MpvPlayer* player, QWidget* parent) : QWidget(parent), player_(player) {
   setAttribute(Qt::WA_OpaquePaintEvent);
   connect(player_, &MpvPlayer::videoRedrawNeeded, this, QOverload<>::of(&QWidget::update));
-  // The render API's software backend needs no graphics context: it can
-  // be created right away, unlike the old OpenGL backend which had to
-  // wait for initializeGL().
+  // Neither backend needs this widget's own GL context (the OpenGL one
+  // uses a private offscreen context), so the render context can be
+  // created right away.
   player_->initRenderContext();
 }
 

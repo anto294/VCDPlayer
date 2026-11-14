@@ -6,12 +6,11 @@
 
 class MpvPlayer;
 
-// Video rendering surface: mpv draws directly here (libmpv render API,
-// software backend — see MpvPlayer.cpp for why), same process, same
-// widget — no separate native window. That's why double-click and
-// right-click are plain Qt events, without the workarounds needed in the
-// Electron version (where the video was drawn by an external window that
-// intercepted input on the app's behalf).
+// Video rendering surface. MpvPlayer renders each frame into frame_, a
+// plain CPU pixel buffer (directly with mpv's software backend, or read
+// back from an offscreen FBO with the OpenGL one), and paintEvent draws it
+// with QPainter: one paint path for both backends, inside an ordinary
+// QWidget, so double-click and right-click are plain Qt events.
 class VideoWidget : public QWidget {
   Q_OBJECT
 
@@ -30,5 +29,5 @@ class VideoWidget : public QWidget {
 
  private:
   MpvPlayer* player_;
-  QImage frame_;  // buffer di pixel in cui mpv disegna (MPV_RENDER_API_TYPE_SW)
+  QImage frame_;  // pixel buffer MpvPlayer::render() fills (Format_RGB32 = mpv's "bgr0")
 };
