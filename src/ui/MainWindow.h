@@ -19,6 +19,7 @@ class QSlider;
 class QTranslator;
 
 class DiscSession;
+class SleepInhibitor;
 class MpvPlayer;
 class RemotePanel;
 class VideoWidget;
@@ -114,6 +115,7 @@ class MainWindow : public QMainWindow {
 
   MpvPlayer* player_;
   DiscSession* session_;
+  SleepInhibitor* sleepInhibitor_;
   VideoWidget* video_;
   RemotePanel* remote_;
   QScrollArea* remoteScroll_;  // holds remote_, so its height never sets the window's minimum

@@ -40,6 +40,7 @@
 #include <vector>
 
 #include "../app/DiscSession.h"
+#include "../app/SleepInhibitor.h"
 #include "../mpv/MpvPlayer.h"
 #include "RemotePanel.h"
 #include "VideoWidget.h"
@@ -242,6 +243,7 @@ MainWindow::MainWindow(QWidget* parent) : QMainWindow(parent) {
   }
 
   session_ = new DiscSession(player_, this);
+  sleepInhibitor_ = new SleepInhibitor(this);
 
   const QString screenshotDir = QStandardPaths::writableLocation(QStandardPaths::PicturesLocation) + "/VCDPlayer";
   QDir().mkpath(screenshotDir);
@@ -950,6 +952,8 @@ void MainWindow::onMpvPropertyChanged(const QString& name, const QVariant& value
   } else if (name == "duration") {
     lastDuration_ = value.toDouble();
     timeDurationLabel_->setText(formatTime(lastDuration_));
+  } else if (name == "core-idle") {
+    sleepInhibitor_->setActive(!value.toBool());
   } else if (name == "volume") {
     remote_->setVolume(value.toInt());
   } else if (name == "mute") {

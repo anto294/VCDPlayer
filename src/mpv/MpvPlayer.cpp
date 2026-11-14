@@ -90,6 +90,9 @@ MpvPlayer::MpvPlayer(QObject* parent) : QObject(parent) {
   // the only "item finished" signal (see DiscSession).
   observeProperty("eof-reached", MPV_FORMAT_FLAG);
   observeProperty("vo-configured", MPV_FORMAT_FLAG);
+  // false while playback actually advances (not paused, not parked at the
+  // end of an item): drives the screen-sleep inhibition.
+  observeProperty("core-idle", MPV_FORMAT_FLAG);
 }
 
 MpvPlayer::~MpvPlayer() {

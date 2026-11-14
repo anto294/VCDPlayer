@@ -48,6 +48,7 @@ endif()
 add_executable(VCDPlayer WIN32
     src/main.cpp
     src/app/DiscSession.cpp
+    src/app/SleepInhibitor.cpp
     src/mpv/MpvPlayer.cpp
     src/mpv/VcdStreamProtocol.cpp
     src/ui/VideoWidget.cpp
@@ -58,6 +59,14 @@ add_executable(VCDPlayer WIN32
 )
 
 target_link_libraries(VCDPlayer PRIVATE vcdcore Qt6::Widgets Qt6::OpenGL)
+# SleepInhibitor (keeps the screen on during playback): D-Bus on Linux/BSD,
+# an IOKit power assertion on macOS, plain Win32 on Windows.
+if(APPLE)
+    target_link_libraries(VCDPlayer PRIVATE "-framework IOKit" "-framework CoreFoundation")
+elseif(UNIX)
+    find_package(Qt6 REQUIRED COMPONENTS DBus)
+    target_link_libraries(VCDPlayer PRIVATE Qt6::DBus)
+endif()
 # Single source of the version number (project() above): shown in the
 # About dialog and set as QCoreApplication::applicationVersion().
 target_compile_definitions(VCDPlayer PRIVATE VCDPLAYER_VERSION="${PROJECT_VERSION}")
