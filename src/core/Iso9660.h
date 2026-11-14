@@ -27,16 +27,15 @@ struct DirEntry {
   int64_t length = 0;
 };
 
-// Reads the Primary Volume Descriptor (LBA 16 relative to the data track
-// start) and extracts its root directory record.
-PvdInfo readPvd(CdxaReader& reader, int64_t trackStartLba);
+// Reads the Primary Volume Descriptor (ISO LBA 16) and extracts its root
+// directory record. All LBAs here are ISO LBAs (see imageLayout()).
+PvdInfo readPvd(CdxaReader& reader);
 
 // Lists a directory's entries (files and subdirectories), resolving
 // absolute LBAs on the disc. "." and ".." are excluded.
-std::vector<DirEntry> listDirectory(CdxaReader& reader, int64_t trackStartLba, int64_t dirLba, int64_t dirLen);
+std::vector<DirEntry> listDirectory(CdxaReader& reader, int64_t dirLba, int64_t dirLen);
 
 // Resolves a path like "VCD/INFO.VCD" (case-insensitive) starting from root.
-std::optional<DirEntry> resolvePath(CdxaReader& reader, int64_t trackStartLba, const DirRecord& root,
-                                    const std::string& relPath);
+std::optional<DirEntry> resolvePath(CdxaReader& reader, const DirRecord& root, const std::string& relPath);
 
 }  // namespace vcd

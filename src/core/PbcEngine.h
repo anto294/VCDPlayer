@@ -10,7 +10,7 @@
 
 namespace vcd {
 
-// Absolute reference (in the .bin file) to a Form2 stream already resolved
+// Reference (ISO LBA, see imageLayout()) to a Form2 stream already resolved
 // by DiscLoader: a video track (MPEGAV/AVSEQnn.DAT) or a segment item
 // (SEGMENT/ITEMnnnn.DAT).
 struct StreamRef {

@@ -6,6 +6,8 @@
 #include <string>
 #include <vector>
 
+#include "../core/Cdxa.h"
+
 namespace vcd {
 
 // Registers a custom URI protocol ("vcdxa://<id>") on an mpv_handle that
@@ -22,16 +24,16 @@ class VcdStreamRegistry {
  public:
   VcdStreamRegistry() = default;
 
-  // Registers a stream (.bin file + absolute LBA + Form2 sector count) and
+  // Registers a stream (disc image + ISO LBA + Form2 sector count) and
   // returns the URI to pass to `loadfile` ("vcdxa://<id>").
-  std::string registerStream(std::string binPath, int64_t lba, int64_t sectorCount);
+  std::string registerStream(DiscImage image, int64_t lba, int64_t sectorCount);
 
   // Registers the "vcdxa" protocol on this mpv_handle. Must be called only
   // once, before any `loadfile` that uses a "vcdxa://" URI.
   void installOn(mpv_handle* mpv);
 
   struct StreamDef {
-    std::string binPath;
+    DiscImage image;
     int64_t lba = 0;
     int64_t sectorCount = 0;
   };

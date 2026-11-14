@@ -11,7 +11,7 @@ namespace vcd {
 
 namespace {
 
-std::vector<uint8_t> readWholeFile(CdxaReader& reader, int64_t trackStartLba, const DirEntry& entry) {
+std::vector<uint8_t> readWholeFile(CdxaReader& reader, const DirEntry& entry) {
   // Only used for the small VCD/*.VCD metadata files (LOT.VCD is 64 KB,
   // PSD.VCD at most 256 KB by spec): cap well above that so a corrupt
   // length can't make us read most of the disc into memory.
@@ -19,7 +19,7 @@ std::vector<uint8_t> readWholeFile(CdxaReader& reader, int64_t trackStartLba, co
   if (entry.length > kMaxMetadataFileBytes)
     throw std::runtime_error("VCD metadata file size is corrupt: " + entry.name);
   const int64_t sectorCount = (entry.length + kForm1DataSize - 1) / kForm1DataSize;
-  std::vector<uint8_t> data = reader.readForm1Range(trackStartLba + entry.lba, sectorCount);
+  std::vector<uint8_t> data = reader.readForm1Range(entry.lba, sectorCount);
   data.resize(static_cast<size_t>(entry.length));
   return data;
 }
@@ -45,47 +45,45 @@ LoadedDisc loadDisc(const std::string& cuePath) {
                                ": only raw 2352-byte sector images (MODE2/2352) are supported.");
     }
   }
-  const int64_t trackStartLba = dataTrackStartLba(out.disc);
+  out.image = imageLayout(out.disc);
 
-  CdxaReader fsReader = CdxaReader::open(out.disc.binPath);
-  const PvdInfo pvd = readPvd(fsReader, trackStartLba);
+  CdxaReader fsReader = CdxaReader::open(out.image);
+  const PvdInfo pvd = readPvd(fsReader);
   out.volumeId = pvd.volumeId;
 
-  const std::optional<DirEntry> infoEntry = resolvePath(fsReader, trackStartLba, pvd.root, "VCD/INFO.VCD");
+  const std::optional<DirEntry> infoEntry = resolvePath(fsReader, pvd.root, "VCD/INFO.VCD");
   if (!infoEntry) throw std::runtime_error("VCD/INFO.VCD not found: this doesn't look like a valid Video CD.");
-  out.info = parseInfoVcd(readWholeFile(fsReader, trackStartLba, *infoEntry));
+  out.info = parseInfoVcd(readWholeFile(fsReader, *infoEntry));
 
-  const std::optional<DirEntry> entriesEntry = resolvePath(fsReader, trackStartLba, pvd.root, "VCD/ENTRIES.VCD");
+  const std::optional<DirEntry> entriesEntry = resolvePath(fsReader, pvd.root, "VCD/ENTRIES.VCD");
   if (entriesEntry) {
-    out.entriesFile = parseEntriesVcd(readWholeFile(fsReader, trackStartLba, *entriesEntry));
+    out.entriesFile = parseEntriesVcd(readWholeFile(fsReader, *entriesEntry));
   }
 
   if (out.info.pbcEnabled) {
-    const std::optional<DirEntry> lotEntry = resolvePath(fsReader, trackStartLba, pvd.root, "VCD/LOT.VCD");
-    const std::optional<DirEntry> psdEntry = resolvePath(fsReader, trackStartLba, pvd.root, "VCD/PSD.VCD");
-    if (lotEntry) out.lot = readWholeFile(fsReader, trackStartLba, *lotEntry);
-    if (psdEntry) out.psd = readWholeFile(fsReader, trackStartLba, *psdEntry);
+    const std::optional<DirEntry> lotEntry = resolvePath(fsReader, pvd.root, "VCD/LOT.VCD");
+    const std::optional<DirEntry> psdEntry = resolvePath(fsReader, pvd.root, "VCD/PSD.VCD");
+    if (lotEntry) out.lot = readWholeFile(fsReader, *lotEntry);
+    if (psdEntry) out.psd = readWholeFile(fsReader, *psdEntry);
   }
 
   for (const Track& t : out.disc.tracks) {
     if (t.number == 1) continue;
-    const std::optional<DirEntry> entry = resolvePath(fsReader, trackStartLba, pvd.root, trackFileName(t.number));
+    const std::optional<DirEntry> entry = resolvePath(fsReader, pvd.root, trackFileName(t.number));
     if (!entry) continue;
     const int64_t sectorCount = (entry->length + kForm1DataSize - 1) / kForm1DataSize;
-    const int64_t absLba = trackStartLba + entry->lba;
-    out.trackStreams[t.number] = StreamRef{absLba, sectorCount};
+    out.trackStreams[t.number] = StreamRef{entry->lba, sectorCount};
   }
 
-  const std::optional<DirEntry> segmentDir = resolvePath(fsReader, trackStartLba, pvd.root, "SEGMENT");
+  const std::optional<DirEntry> segmentDir = resolvePath(fsReader, pvd.root, "SEGMENT");
   if (segmentDir) {
     static const std::regex kItemRe(R"(^ITEM(\d+)\.DAT$)", std::regex::icase);
-    for (const DirEntry& it : listDirectory(fsReader, trackStartLba, segmentDir->lba, segmentDir->length)) {
+    for (const DirEntry& it : listDirectory(fsReader, segmentDir->lba, segmentDir->length)) {
       std::smatch m;
       if (!std::regex_match(it.name, m, kItemRe)) continue;
       const int segNum = std::stoi(m[1]);
       const int64_t sectorCount = (it.length + kForm1DataSize - 1) / kForm1DataSize;
-      const int64_t absLba = trackStartLba + it.lba;
-      out.segmentStreams[segNum] = StreamRef{absLba, sectorCount};
+      out.segmentStreams[segNum] = StreamRef{it.lba, sectorCount};
     }
   }
 

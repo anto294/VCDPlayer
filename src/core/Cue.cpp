@@ -1,5 +1,6 @@
 #include "Cue.h"
 
+#include <algorithm>
 #include <cctype>
 #include <filesystem>
 #include <fstream>
@@ -86,7 +87,6 @@ Disc parseCue(const std::string& cuePath) {
   Disc disc;
   disc.cuePath = cuePath;
   Track* currentTrack = nullptr;
-  std::map<int, int64_t> pregapByTrack;  // number -> pregap length (in frames)
 
   std::istringstream lines(text);
   std::string rawLine;
@@ -96,23 +96,25 @@ Disc parseCue(const std::string& cuePath) {
 
     std::smatch m;
     if (std::regex_search(line, m, kFileRe)) {
-      if (!disc.binPath.empty()) {
+      if (!disc.files.empty()) {
         throw std::runtime_error("Only .cue files with a single FILE directive are supported.");
       }
-      disc.binPath = resolveBinPath(fs::path(cuePath).parent_path(), m[1].str());
+      disc.files.push_back(resolveBinPath(fs::path(cuePath).parent_path(), m[1].str()));
       continue;
     }
     if (std::regex_search(line, m, kTrackRe)) {
+      if (disc.files.empty()) throw std::runtime_error("TRACK before any FILE directive.");
       disc.tracks.push_back(Track{});
       currentTrack = &disc.tracks.back();
       currentTrack->number = std::stoi(m[1]);
       currentTrack->mode = m[2];
       currentTrack->sectorSize = sectorSizeFromMode(currentTrack->mode);
+      currentTrack->fileIndex = disc.files.size() - 1;
       continue;
     }
     if (std::regex_search(line, m, kPregapRe)) {
       if (!currentTrack) throw std::runtime_error("PREGAP outside of a TRACK.");
-      pregapByTrack[currentTrack->number] = parseMsf(m[1]);
+      currentTrack->pregap = parseMsf(m[1]);
       continue;
     }
     if (std::regex_search(line, m, kIndexRe)) {
@@ -123,28 +125,67 @@ Disc parseCue(const std::string& cuePath) {
     // Other directives (CATALOG, FLAGS, ISRC, TITLE, PERFORMER, ...) ignored.
   }
 
-  if (disc.binPath.empty()) throw std::runtime_error("The .cue file has no FILE directive.");
+  if (disc.files.empty()) throw std::runtime_error("The .cue file has no FILE directive.");
   if (disc.tracks.empty()) throw std::runtime_error("The .cue file has no tracks.");
 
-  for (auto& t : disc.tracks) {
+  for (const auto& t : disc.tracks) {
     if (t.indices.find(1) == t.indices.end()) {
       throw std::runtime_error("Track " + std::to_string(t.number) + ": missing INDEX 01.");
-    }
-    if (t.indices.find(0) == t.indices.end()) {
-      // Without an explicit INDEX00, the pregap (if any) precedes INDEX01.
-      const auto pIt = pregapByTrack.find(t.number);
-      t.indices[0] = pIt != pregapByTrack.end() ? t.indices[1] - pIt->second : t.indices[1];
     }
   }
 
   return disc;
 }
 
-int64_t dataTrackStartLba(const Disc& disc) {
-  for (const auto& t : disc.tracks) {
-    if (t.number == 1) return t.indices.at(1);
+DiscImage imageLayout(const Disc& disc) {
+  DiscImage image;
+  image.files = disc.files;
+
+  // Every file's sectors, laid end to end in FILE order ("global" positions).
+  std::vector<int64_t> fileStart;
+  int64_t total = 0;
+  for (const std::string& path : disc.files) {
+    std::error_code ec;
+    const auto bytes = fs::file_size(path, ec);
+    if (ec) throw std::runtime_error("Unable to open .bin file: " + path);
+    fileStart.push_back(total);
+    total += static_cast<int64_t>(bytes / kSectorSize);
   }
-  throw std::runtime_error("Track 1 not found in the .cue file.");
+
+  // ISO LBA 0 = the data track's INDEX 01.
+  const Track& dataTrack = disc.tracks.front();
+  const int64_t origin = fileStart[dataTrack.fileIndex] + dataTrack.indices.at(1);
+
+  // Region boundaries: each file's start, plus the first stored sector of
+  // every later track with a PREGAP — the disc has `pregap` extra sectors
+  // right before it, so every ISO LBA from there on is that much further
+  // ahead of the file position.
+  struct Split {
+    int64_t global;
+    int64_t gap;
+  };
+  std::vector<Split> splits;
+  for (size_t f = 0; f < disc.files.size(); f++) splits.push_back({fileStart[f], 0});
+  for (size_t i = 1; i < disc.tracks.size(); i++) {
+    const Track& t = disc.tracks[i];
+    if (t.pregap <= 0) continue;
+    const auto idx0 = t.indices.find(0);
+    const int64_t firstStored = idx0 != t.indices.end() ? idx0->second : t.indices.at(1);
+    splits.push_back({fileStart[t.fileIndex] + firstStored, t.pregap});
+  }
+  std::stable_sort(splits.begin(), splits.end(), [](const Split& a, const Split& b) { return a.global < b.global; });
+
+  int64_t gapSoFar = 0;
+  for (size_t k = 0; k < splits.size(); k++) {
+    gapSoFar += splits[k].gap;
+    const int64_t start = splits[k].global;
+    const int64_t end = k + 1 < splits.size() ? splits[k + 1].global : total;
+    if (end <= start) continue;
+    size_t file = 0;
+    while (file + 1 < fileStart.size() && fileStart[file + 1] <= start) file++;
+    image.regions.push_back(ImageRegion{file, start - fileStart[file], start - origin + gapSoFar, end - start});
+  }
+  return image;
 }
 
 }  // namespace vcd

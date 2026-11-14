@@ -9,7 +9,7 @@ namespace vcd {
 
 namespace {
 
-constexpr int64_t kPvdLbaOffset = 16;  // relative to the data track start (LBA 0 = INDEX01 of track 1)
+constexpr int64_t kPvdLba = 16;
 
 uint32_t readU32LE(const uint8_t* p) {
   return static_cast<uint32_t>(p[0]) | (static_cast<uint32_t>(p[1]) << 8) | (static_cast<uint32_t>(p[2]) << 16) |
@@ -32,8 +32,8 @@ std::string toUpperAscii(const std::string& s) {
 
 }  // namespace
 
-PvdInfo readPvd(CdxaReader& reader, int64_t trackStartLba) {
-  const std::vector<uint8_t> sector = reader.readForm1Range(trackStartLba + kPvdLbaOffset, 1);
+PvdInfo readPvd(CdxaReader& reader) {
+  const std::vector<uint8_t> sector = reader.readForm1Range(kPvdLba, 1);
   if (sector[0] != 1 || std::string(reinterpret_cast<const char*>(sector.data() + 1), 5) != "CD001") {
     throw std::runtime_error("ISO9660 Primary Volume Descriptor not found (invalid data track).");
   }
@@ -46,14 +46,14 @@ PvdInfo readPvd(CdxaReader& reader, int64_t trackStartLba) {
   return info;
 }
 
-std::vector<DirEntry> listDirectory(CdxaReader& reader, int64_t trackStartLba, int64_t dirLba, int64_t dirLen) {
+std::vector<DirEntry> listDirectory(CdxaReader& reader, int64_t dirLba, int64_t dirLen) {
   // A Video CD's directories hold a handful of entries (SEGMENT/, the
   // biggest, at most ~2000 ITEMnnnn.DAT records ≈ 100 KB); anything past
   // this is a corrupt length, not a real directory.
   constexpr int64_t kMaxDirectoryBytes = 1024 * 1024;
   if (dirLen < 0 || dirLen > kMaxDirectoryBytes) throw std::runtime_error("ISO9660 directory size is corrupt.");
   const int64_t sectorCount = (dirLen + kForm1DataSize - 1) / kForm1DataSize;
-  const std::vector<uint8_t> raw = reader.readForm1Range(trackStartLba + dirLba, sectorCount);
+  const std::vector<uint8_t> raw = reader.readForm1Range(dirLba, sectorCount);
 
   std::vector<DirEntry> entries;
   size_t off = 0;
@@ -99,8 +99,7 @@ std::vector<DirEntry> listDirectory(CdxaReader& reader, int64_t trackStartLba, i
   return entries;
 }
 
-std::optional<DirEntry> resolvePath(CdxaReader& reader, int64_t trackStartLba, const DirRecord& root,
-                                    const std::string& relPath) {
+std::optional<DirEntry> resolvePath(CdxaReader& reader, const DirRecord& root, const std::string& relPath) {
   std::vector<std::string> parts;
   std::istringstream iss(relPath);
   std::string part;
@@ -111,7 +110,7 @@ std::optional<DirEntry> resolvePath(CdxaReader& reader, int64_t trackStartLba, c
 
   DirRecord current = root;
   for (size_t i = 0; i < parts.size(); i++) {
-    const std::vector<DirEntry> entries = listDirectory(reader, trackStartLba, current.lba, current.length);
+    const std::vector<DirEntry> entries = listDirectory(reader, current.lba, current.length);
     const std::string wanted = toUpperAscii(parts[i]);
     const auto it =
         std::find_if(entries.begin(), entries.end(), [&](const DirEntry& e) { return toUpperAscii(e.name) == wanted; });

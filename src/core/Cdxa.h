@@ -38,23 +38,40 @@ struct Subheader {
   bool isEndOfFile = false;
 };
 
-// Reads/interprets raw CD-XA sectors (2352 bytes) from a .bin file.
+// One contiguous run of the disc's ISO sectors, stored contiguously in one
+// image file (see imageLayout() in Cue.h for how these are derived).
+struct ImageRegion {
+  size_t fileIndex = 0;  // index into DiscImage::files
+  int64_t fileLba = 0;   // first sector's position within that file
+  int64_t isoLba = 0;    // first sector's ISO LBA
+  int64_t count = 0;     // number of sectors
+};
+
+// The image file(s) of a disc plus where each of its ISO sectors lives.
+struct DiscImage {
+  std::vector<std::string> files;
+  std::vector<ImageRegion> regions;  // sorted by isoLba, non-overlapping
+};
+
+// Reads/interprets raw CD-XA sectors (2352 bytes) of a disc image, addressed
+// by ISO LBA.
 class CdxaReader {
  public:
-  // Opens the .bin file. Throws std::runtime_error if it can't be opened.
+  // Opens every file of the image. Throws std::runtime_error if one can't
+  // be opened.
+  static CdxaReader open(const DiscImage& image);
+
+  // Single .bin whose sector N is ISO LBA N (no pregaps, no extra files).
   static CdxaReader open(const std::string& binPath);
 
   CdxaReader() = default;
-  CdxaReader(CdxaReader&& other) noexcept;
+  CdxaReader(CdxaReader&& other) noexcept = default;
   CdxaReader& operator=(CdxaReader&& other) noexcept;
   CdxaReader(const CdxaReader&) = delete;
   CdxaReader& operator=(const CdxaReader&) = delete;
   ~CdxaReader();
 
   void close();
-
-  // Number of whole 2352-byte sectors in the opened .bin file.
-  int64_t sectorCount() const { return sectorCount_; }
 
   // Reads the full raw sector (2352 bytes) at the given LBA into out (must
   // have at least kSectorSize bytes).
@@ -72,18 +89,19 @@ class CdxaReader {
 
   // Reads n consecutive sectors starting at lba and concatenates their
   // Form2 payload (2324B/sector, used by the MPEG-PS streams under
-  // MPEGAV/SEGMENT). A single read over the contiguous raw block, then
+  // MPEGAV/SEGMENT). One read per contiguous stored run, then
   // de-interleaves the payloads.
   std::vector<uint8_t> readForm2Range(int64_t lba, int64_t count);
 
  private:
-  CdxaReader(FILE* fp, int64_t sectorCount) : fp_(fp), sectorCount_(sectorCount) {}
+  // The region holding `lba`. Throws if no image file stores that sector.
+  const ImageRegion& regionFor(int64_t lba) const;
 
-  // Throws unless [lba, lba + count) lies entirely inside the .bin file.
+  // Throws unless every sector of [lba, lba + count) is stored in the image.
   void checkRange(int64_t lba, int64_t count) const;
 
-  FILE* fp_ = nullptr;
-  int64_t sectorCount_ = 0;
+  std::vector<FILE*> files_;
+  std::vector<ImageRegion> regions_;
 };
 
 }  // namespace vcd

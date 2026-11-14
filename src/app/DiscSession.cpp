@@ -52,7 +52,7 @@ void DiscSession::sendRemoteButton(vcd::RemoteButton btn, int number) {
 
 void DiscSession::loadAndPlay(int64_t lba, int64_t sectorCount) {
   if (!disc_) return;
-  const std::string uri = registry_.registerStream(disc_->disc.binPath, lba, sectorCount);
+  const std::string uri = registry_.registerStream(disc_->image, lba, sectorCount);
   player_->command({"loadfile", QString::fromStdString(uri)});
 }
 

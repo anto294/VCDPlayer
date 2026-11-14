@@ -78,7 +78,7 @@ int OpenCb(void* userData, char* uri, mpv_stream_cb_info* info) {
 
   auto* cookie = new StreamCookie();
   try {
-    cookie->reader = CdxaReader::open(def->binPath);
+    cookie->reader = CdxaReader::open(def->image);
   } catch (const std::exception&) {
     delete cookie;
     return MPV_ERROR_LOADING_FAILED;
@@ -98,9 +98,9 @@ int OpenCb(void* userData, char* uri, mpv_stream_cb_info* info) {
 
 }  // namespace
 
-std::string VcdStreamRegistry::registerStream(std::string binPath, int64_t lba, int64_t sectorCount) {
+std::string VcdStreamRegistry::registerStream(DiscImage image, int64_t lba, int64_t sectorCount) {
   const int id = static_cast<int>(streams_.size());
-  streams_.push_back(StreamDef{std::move(binPath), lba, sectorCount});
+  streams_.push_back(StreamDef{std::move(image), lba, sectorCount});
   return "vcdxa://" + std::to_string(id);
 }
 

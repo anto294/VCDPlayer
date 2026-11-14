@@ -11,6 +11,7 @@ namespace vcd {
 
 struct LoadedDisc {
   Disc disc;
+  DiscImage image;  // where each ISO sector lives in the .bin file(s)
   std::string volumeId;
   VcdInfo info;
   EntriesFile entriesFile;
@@ -21,9 +22,10 @@ struct LoadedDisc {
 };
 
 // Opens a VCD disc from its .cue: parses the ISO9660 filesystem and PBC
-// metadata, resolves the absolute LBA of every video track
-// (MPEGAV/AVSEQnn.DAT) and segment item (SEGMENT/ITEMnnnn.DAT) in the
-// .bin file. Throws std::runtime_error on invalid input/not a VCD.
+// metadata, resolves the ISO LBA of every video track
+// (MPEGAV/AVSEQnn.DAT) and segment item (SEGMENT/ITEMnnnn.DAT), plus the
+// image layout mapping those onto the .bin (see imageLayout()). Throws
+// std::runtime_error on invalid input/not a VCD.
 LoadedDisc loadDisc(const std::string& cuePath);
 
 }  // namespace vcd
