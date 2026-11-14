@@ -60,6 +60,11 @@ class MpvPlayer : public QObject {
   // the window happens to get resized. No-op for the OpenGL backend.
   void refreshSoftwareScaler();
 
+  // False while no video output is configured (nothing loaded, or after
+  // "stop"): mpv then draws nothing at all, so the widget must clear itself
+  // instead of rendering, or the last frame would stay on screen.
+  bool hasVideo() const { return voConfigured_; }
+
   int command(const QStringList& args);
   void setPropertyString(const QString& name, const QString& value);
   void setPropertyFlag(const QString& name, bool value);
@@ -91,6 +96,7 @@ class MpvPlayer : public QObject {
   mpv_handle* mpv_ = nullptr;
   mpv_render_context* renderCtx_ = nullptr;
   RenderBackend backend_ = RenderBackend::Software;
+  bool voConfigured_ = false;
 
   // Only used for RenderBackend::OpenGL: an offscreen context/surface mpv
   // renders into, read back into the same CPU pixel buffer the software

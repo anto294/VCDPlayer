@@ -9,6 +9,7 @@
 #include <QOpenGLFunctions>
 #include <QSurfaceFormat>
 #include <QVector>
+#include <cstring>
 #include <stdexcept>
 
 namespace {
@@ -88,6 +89,7 @@ MpvPlayer::MpvPlayer(QObject* parent) : QObject(parent) {
   // the last frame and flips eof-reached instead. That flag is therefore
   // the only "item finished" signal (see DiscSession).
   observeProperty("eof-reached", MPV_FORMAT_FLAG);
+  observeProperty("vo-configured", MPV_FORMAT_FLAG);
 }
 
 MpvPlayer::~MpvPlayer() {
@@ -355,6 +357,10 @@ void MpvPlayer::processMpvEvents() {
         value = static_cast<bool>(*static_cast<int*>(prop->data));
       } else if (prop->format == MPV_FORMAT_STRING) {
         value = QString::fromUtf8(*static_cast<char**>(prop->data));
+      }
+      if (std::strcmp(prop->name, "vo-configured") == 0) {
+        voConfigured_ = value.toBool();
+        emit videoRedrawNeeded();
       }
       emit propertyChanged(QString::fromUtf8(prop->name), value);
     }

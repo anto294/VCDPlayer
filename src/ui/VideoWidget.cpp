@@ -28,7 +28,7 @@ void VideoWidget::resizeEvent(QResizeEvent* event) {
 
 void VideoWidget::paintEvent(QPaintEvent*) {
   QPainter painter(this);
-  if (frame_.isNull()) {
+  if (frame_.isNull() || !player_->hasVideo()) {
     painter.fillRect(rect(), Qt::black);
     return;
   }
