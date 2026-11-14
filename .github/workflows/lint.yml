@@ -32,7 +32,7 @@ jobs:
         run: pip install clang-format==22.1.8
 
       - name: Check formatting
-        run: find src \( -name '*.cpp' -o -name '*.h' \) -exec clang-format --dry-run --Werror {} +
+        run: find src tests \( -name '*.cpp' -o -name '*.h' \) -exec clang-format --dry-run --Werror {} +
 
   tidy:
     name: clang-tidy

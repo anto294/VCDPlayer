@@ -1,0 +1,40 @@
+name: Test
+
+on:
+  push:
+    branches: [master]
+  pull_request:
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  unit:
+    # vcdcore (disc-image parsing + PBC engine) and its unit tests only:
+    # VCDPLAYER_BUILD_APP=OFF skips Qt and libmpv entirely, so this needs
+    # nothing beyond a compiler. Run under AddressSanitizer + UBSan, with
+    # recovery off, so any out-of-bounds read or UB in the parsers fails the
+    # job instead of just being printed.
+    name: Unit tests (ASan + UBSan)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Configure
+        run: >-
+          cmake -S . -B build -G Ninja
+          -DCMAKE_BUILD_TYPE=Debug
+          -DVCDPLAYER_BUILD_APP=OFF
+          "-DCMAKE_CXX_FLAGS=-fsanitize=address,undefined -fno-sanitize-recover=all -fno-omit-frame-pointer"
+
+      - name: Build
+        run: cmake --build build
+
+      - name: Run tests
+        run: ctest --test-dir build --output-on-failure

@@ -2,6 +2,7 @@
 
 [![Build](https://github.com/anto294/VCDPlayer/actions/workflows/build.yml/badge.svg)](https://github.com/anto294/VCDPlayer/actions/workflows/build.yml)
 [![Lint](https://github.com/anto294/VCDPlayer/actions/workflows/lint.yml/badge.svg)](https://github.com/anto294/VCDPlayer/actions/workflows/lint.yml)
+[![Test](https://github.com/anto294/VCDPlayer/actions/workflows/test.yml/badge.svg)](https://github.com/anto294/VCDPlayer/actions/workflows/test.yml)
 [![CodeQL](https://github.com/anto294/VCDPlayer/actions/workflows/codeql.yml/badge.svg)](https://github.com/anto294/VCDPlayer/actions/workflows/codeql.yml)
 
 A cross-platform desktop player for Video CDs (VCD), built with Qt6 and
@@ -118,10 +119,20 @@ Code style is enforced by [.clang-format](.clang-format) and
 (plus shellcheck on the `ci/` scripts and actionlint on the workflows).
 **CodeQL** runs a security analysis of every PR, and when the repository has
 an `ANTHROPIC_API_KEY` secret the **Review** workflow also posts an automated
-code review. To run the style checks locally:
+code review. The **Test** workflow builds the disc-parsing core and its unit
+tests (`tests/`) under AddressSanitizer/UBSan. To run them locally — no Qt or
+libmpv needed:
 
 ```sh
-find src -name '*.cpp' -o -name '*.h' | xargs clang-format -i
+cmake -S . -B build-tests -DVCDPLAYER_BUILD_APP=OFF \
+  "-DCMAKE_CXX_FLAGS=-fsanitize=address,undefined -fno-sanitize-recover=all"
+cmake --build build-tests && ctest --test-dir build-tests --output-on-failure
+```
+
+To run the style checks locally:
+
+```sh
+find src tests -name '*.cpp' -o -name '*.h' | xargs clang-format -i
 clang-tidy -p build src/**/*.cpp   # needs a build/ configured with
                                     # -DCMAKE_EXPORT_COMPILE_COMMANDS=ON
 ```

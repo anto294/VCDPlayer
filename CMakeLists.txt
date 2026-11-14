@@ -4,6 +4,32 @@ project(VCDPlayer CXX)
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
+option(VCDPLAYER_BUILD_APP "Build the Qt application (needs Qt6 and libmpv)" ON)
+include(CTest)  # BUILD_TESTING, on by default
+
+# Disc-image reading (CUE/CD-XA/ISO9660/VCD metadata) and the PBC state
+# machine: plain C++17 with no Qt or mpv dependency, shared by the app and
+# the unit tests.
+add_library(vcdcore STATIC
+    src/core/Cue.cpp
+    src/core/Cdxa.cpp
+    src/core/Iso9660.cpp
+    src/core/VcdMeta.cpp
+    src/core/PbcEngine.cpp
+    src/core/DiscLoader.cpp
+)
+target_include_directories(vcdcore PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/src/core)
+
+if(BUILD_TESTING)
+    add_subdirectory(tests)
+endif()
+
+# -DVCDPLAYER_BUILD_APP=OFF builds just vcdcore and its tests, without
+# needing Qt or libmpv installed (the CI's sanitizer test job does this).
+if(NOT VCDPLAYER_BUILD_APP)
+    return()
+endif()
+
 set(CMAKE_AUTOMOC ON)
 set(CMAKE_AUTORCC ON)
 set(CMAKE_AUTOUIC ON)
@@ -21,12 +47,6 @@ endif()
 
 add_executable(VCDPlayer WIN32
     src/main.cpp
-    src/core/Cue.cpp
-    src/core/Cdxa.cpp
-    src/core/Iso9660.cpp
-    src/core/VcdMeta.cpp
-    src/core/PbcEngine.cpp
-    src/core/DiscLoader.cpp
     src/app/DiscSession.cpp
     src/mpv/MpvPlayer.cpp
     src/mpv/VcdStreamProtocol.cpp
@@ -37,7 +57,7 @@ add_executable(VCDPlayer WIN32
     ${APP_ICON_RESOURCE}
 )
 
-target_link_libraries(VCDPlayer PRIVATE Qt6::Widgets Qt6::OpenGL)
+target_link_libraries(VCDPlayer PRIVATE vcdcore Qt6::Widgets Qt6::OpenGL)
 
 # libmpv lookup:
 # - Linux/macOS: a system libmpv (distro package, Homebrew, ...) is the
