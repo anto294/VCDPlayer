@@ -43,9 +43,7 @@ struct Failure {
 #define TEST(name)                                                           \
   void name();                                                               \
   static const ::test::Registrar TEST_CONCAT(registrar_, name)(#name, name); \
-  void name();                                                               \
-  static const ::test::Registrar TEST_CONCAT(registrar_, name)(#name, name); \
-  static void name()
+  void name()
 
 #define CHECK(cond)                                                      \
   do {                                                                   \
