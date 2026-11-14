@@ -37,8 +37,13 @@ struct Failure {
 
 #define TEST_CONCAT2(a, b) a##b
 #define TEST_CONCAT(a, b) TEST_CONCAT2(a, b)
+// Test bodies get external linkage (test names are unique across the
+// suite): as `static` functions only ever reached through the Registrar's
+// function pointer, CodeQL reported every one as an unused function.
 #define TEST(name)                                                           \
-  static void name();                                                        \
+  void name();                                                               \
+  static const ::test::Registrar TEST_CONCAT(registrar_, name)(#name, name); \
+  void name();                                                               \
   static const ::test::Registrar TEST_CONCAT(registrar_, name)(#name, name); \
   static void name()
 
