@@ -3,6 +3,40 @@
 Notable changes to VCD Player, release by release. Format loosely follows
 [Keep a Changelog](https://keepachangelog.com/).
 
+## [v1.1.0] - 2026-11-14
+
+### Added
+
+- **Go to chapter** (Playback menu and right-click menu): every chapter of
+  the disc with its real start time, read from the MPEG stream.
+- **Resume where you left off**: reopening a disc closed in the middle of a
+  video offers to continue from there.
+- **File > Recent discs**.
+- **Info > Disc information**: volume, album, format, PBC, tracks and their
+  lengths, chapters.
+- Karaoke channel selection under **Audio > Channels**: stereo, left only or
+  right only (vocals on or off on karaoke discs).
+- The screen no longer dims, locks or sleeps while a video plays.
+- Media keys; on Linux, MPRIS integration (the desktop's media widget, lock
+  screen, KDE Connect, `playerctl`).
+- `.cue` file association on Linux (desktop entry) and Windows (installer).
+- New packages: Windows installer, Linux Flatpak and `.deb` (Ubuntu 24.04+,
+  Debian 13+), alongside the portable zip and the AppImage.
+
+### Fixed
+
+- A corrupt disc menu (PSD) whose nodes looped back on themselves with
+  nothing to play crashed the player.
+- Menu items pointing at a chapter past the end of its track (an
+  inconsistent disc) were played as an empty stream; they're now skipped.
+- Next/Previous did nothing on discs without PBC; they now change track.
+- Discs without PBC never showed "Playing" in the remote panel.
+- Windows: discs in folders with non-ASCII names (e.g. "Città") failed to
+  open.
+- Opening a disc that fails no longer blanks the title and status of the
+  one still playing.
+- A warning was logged on every item change.
+
 ## [v1.0.0] - 2026-11-14
 
 ### Added
