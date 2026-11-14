@@ -328,8 +328,11 @@ void PbcEngine::jumpToEntry(int entryIndex) {
   currentDescriptor_.reset();
   currentOffset_ = -1;
   plainTrack_ = entry.track;
+  // The whole track, started at the chapter (CD sectors play at 75 per
+  // second): the position and seek bar then cover the whole track rather
+  // than a fragment of it, and seeking back before the chapter works.
   const int64_t startSector = std::clamp<int64_t>(entry.isoLba - it->second.lba, 0, it->second.sectorCount - 1);
-  load(StreamRef{it->second.lba + startSector, it->second.sectorCount - startSector});
+  load(it->second, static_cast<double>(startSector) / 75.0);
   notify();
 }
 

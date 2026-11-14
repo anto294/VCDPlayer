@@ -320,9 +320,10 @@ TEST(jump_to_entry_leaves_pbc_and_return_goes_back_to_menu) {
   Engine e(b);
   e.engine.start();
   CHECK(e.engine.state().kind == Kind::Menu);
-  e.engine.jumpToEntry(1);
-  CHECK_EQ(e.host.lastLba, 2004);
-  CHECK_EQ(e.host.lastSectors, 6);
+  e.engine.jumpToEntry(1);  // whole track 2, started 4 sectors in
+  CHECK_EQ(e.host.lastLba, 2000);
+  CHECK_EQ(e.host.lastSectors, 10);
+  CHECK_EQ(e.host.lastStart, 4 / 75.0);
   CHECK(e.engine.state().kind == Kind::Playing);
   e.engine.onEof();  // carries on with the next track
   CHECK_EQ(e.host.lastTrack(), 3);
