@@ -348,6 +348,15 @@ void MainWindow::buildMenuBar() {
   buildAdvancedMenu();
   buildExperimentalMenu();
   buildInfoMenu();
+
+  // Qt only fires a QAction's shortcut while the action belongs to a
+  // visible widget, and fullscreen hides the menu bar: Space, F11, M,
+  // Ctrl+arrows etc. all went dead until fullscreen was left. Adding the
+  // shortcut-bearing actions to the window itself keeps them live. (They
+  // die with the menu bar on retranslateUi(), which drops them from here.)
+  for (QAction* action : menuBar()->findChildren<QAction*>()) {
+    if (!action->shortcut().isEmpty()) addAction(action);
+  }
 }
 
 void MainWindow::buildFileMenu() {
