@@ -28,8 +28,9 @@ alongside a plain sequential-playback fallback for discs without PBC.
 - Two mpv render backends — Software (safe default, works everywhere) and
   Hardware/OpenGL (GPU-accelerated) — picked automatically or set manually
   under **Advanced > Rendering**
-- Experimental GPU (Anime4K) and CPU upscaling for VCD's low native
-  resolution (352x288), under the **Experimental** menu
+- Experimental GPU upscaling presets (Anime4K for cartoons, FSRCNNX for live
+  action, RAVU, AMD FSR, AMD CAS sharpening) and CPU upscaling for VCD's low
+  native resolution (352x288), under the **Experimental** menu
 - Open via drag & drop, "Open with", or command line (`VCDPlayer.exe path\to\disc.cue`)
 - Italian and English UI (Qt Linguist `.ts`/`.qm`)
 
@@ -148,5 +149,6 @@ stderr while diagnosing a playback problem, start VCD Player with
 GPLv3 or later — see [LICENSE](LICENSE). This choice follows from linking
 against mpv's default GPLv2+ build; see the licensing note above.
 
-Bundles the Anime4K "Upscale (M)" GLSL shader (MIT, bloc97) — see
+Bundles third-party mpv upscaling shaders (Anime4K, FSRCNNX, RAVU, AMD
+FidelityFX FSR/CAS; MIT and LGPL-3.0) — sources, versions and licenses in
 [shaders/README.md](shaders/README.md).

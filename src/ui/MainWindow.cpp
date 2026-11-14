@@ -36,6 +36,7 @@
 #include <QVBoxLayout>
 #include <algorithm>
 #include <cmath>
+#include <vector>
 
 #include "../app/DiscSession.h"
 #include "../mpv/MpvPlayer.h"
@@ -72,11 +73,47 @@ QString formatTime(double seconds) {
   return QStringLiteral("%1:%2").arg(s / 60, 2, 10, QChar('0')).arg(s % 60, 2, 10, QChar('0'));
 }
 
-// Shipped as a plain file next to the executable (see shaders/README.md and
-// the CMakeLists.txt copy step), not a Qt resource — mpv reads shader files
-// by path itself and has no notion of Qt's :/ resource paths.
-QString AiUpscaleShaderPath() {
-  return QCoreApplication::applicationDirPath() + QStringLiteral("/shaders/Anime4K_Upscale_CNN_x2_M.glsl");
+// GPU upscaling presets for Experimental > GPU upscaling: each is a chain
+// of mpv user shaders from shaders/ (sources, versions and licenses in
+// shaders/README.md). They only take effect with the Hardware (OpenGL)
+// render backend, which runs mpv's GPU shader pipeline. Only shaders that
+// work with the classic "gpu" renderer behind libmpv's render API qualify:
+// ArtCNN (crashes it with an assertion) and NVIDIA Image Scaling (uses
+// //!PARAM, which only gpu-next parses) were tried and left out.
+struct UpscalerPreset {
+  const char* id;     // persisted in the "upscaler" setting
+  const char* label;  // menu text, translated in buildExperimentalMenu()
+  QStringList files;  // shader chain, applied in this order
+};
+
+const std::vector<UpscalerPreset>& UpscalerPresets() {
+  static const std::vector<UpscalerPreset> kPresets = {
+      {"off", QT_TRANSLATE_NOOP("MainWindow", "Off"), {}},
+      {"anime4k",
+       QT_TRANSLATE_NOOP("MainWindow", "Anime4K — cartoons (restore + upscale)"),
+       {QStringLiteral("Anime4K_Clamp_Highlights.glsl"), QStringLiteral("Anime4K_Restore_CNN_M.glsl"),
+        QStringLiteral("Anime4K_Upscale_CNN_x2_M.glsl")}},
+      {"fsrcnnx",
+       QT_TRANSLATE_NOOP("MainWindow", "FSRCNNX — live action"),
+       {QStringLiteral("FSRCNNX_x2_8-0-4-1.glsl")}},
+      {"ravu", QT_TRANSLATE_NOOP("MainWindow", "RAVU — general purpose"), {QStringLiteral("ravu-lite-ar-r3.hook")}},
+      {"fsr", QT_TRANSLATE_NOOP("MainWindow", "AMD FSR — fast"), {QStringLiteral("FSR.glsl")}},
+      {"cas", QT_TRANSLATE_NOOP("MainWindow", "AMD CAS — sharpening only"), {QStringLiteral("CAS-scaled.glsl")}},
+  };
+  return kPresets;
+}
+
+// mpv's glsl-shaders value for a preset: full paths, joined with the
+// platform's path-list separator (':' on Unix, ';' on Windows). Shaders are
+// plain files next to the executable (see the CMakeLists.txt copy step),
+// not Qt resources: mpv reads them by path and knows nothing of :/ paths.
+QString UpscalerShaderList(const QString& id) {
+  QStringList paths;
+  for (const UpscalerPreset& p : UpscalerPresets()) {
+    if (id != QLatin1String(p.id)) continue;
+    for (const QString& f : p.files) paths << QCoreApplication::applicationDirPath() + QStringLiteral("/shaders/") + f;
+  }
+  return paths.join(QDir::listSeparator());
 }
 
 // Keeps a single child locked to a 4:3 box, centered within whatever space
@@ -179,15 +216,19 @@ MainWindow::MainWindow(QWidget* parent) : QMainWindow(parent) {
   }
   player_->setPreferredRenderBackend(backend);
 
-  // Just an mpv option (see setAiUpscalingEnabled()), so it's safe to set
+  // Just an mpv option (see setUpscaler()), so it's safe to set
   // straight away regardless of which backend ends up active — it only
   // does anything once the GPU shader pipeline (Hardware/OpenGL backend)
   // is actually in use. Set directly rather than through
-  // setAiUpscalingEnabled() so startup doesn't pop the "requires Hardware
+  // setUpscaler() so startup doesn't pop the "requires Hardware
   // rendering" notice on every launch when the setting is on but Automatic
   // resolved to Software.
-  aiUpscalingEnabled_ = QSettings().value(QStringLiteral("aiUpscaling"), false).toBool();
-  if (aiUpscalingEnabled_) player_->setPropertyString("glsl-shaders", AiUpscaleShaderPath());
+  // "aiUpscaling" was the old on/off Anime4K toggle: carry it over.
+  const QString legacyDefault = QSettings().value(QStringLiteral("aiUpscaling"), false).toBool()
+                                    ? QStringLiteral("anime4k")
+                                    : QStringLiteral("off");
+  upscaler_ = QSettings().value(QStringLiteral("upscaler"), legacyDefault).toString();
+  if (upscaler_ != QStringLiteral("off")) player_->setPropertyString("glsl-shaders", UpscalerShaderList(upscaler_));
 
   // Same idea as above, but for the Software backend's sharpen-on-top-of-
   // Lanczos pass (see setCpuUpscalingEnabled()): applied directly here to
@@ -505,10 +546,18 @@ void MainWindow::buildAdvancedMenu() {
 
 void MainWindow::buildExperimentalMenu() {
   auto* experimentalMenu = menuBar()->addMenu(tr("&Experimental"));
-  aiUpscalingAction_ = experimentalMenu->addAction(tr("AI upscaling (Anime4K, GPU)"));
-  aiUpscalingAction_->setCheckable(true);
-  aiUpscalingAction_->setChecked(aiUpscalingEnabled_);
-  connect(aiUpscalingAction_, &QAction::triggered, this, &MainWindow::setAiUpscalingEnabled);
+  auto* upscalingMenu = experimentalMenu->addMenu(tr("GPU upscaling"));
+  auto* upscalingGroup = new QActionGroup(upscalingMenu);
+  upscalingGroup->setExclusive(true);
+  for (const UpscalerPreset& preset : UpscalerPresets()) {
+    QAction* action = upscalingMenu->addAction(tr(preset.label));
+    action->setCheckable(true);
+    action->setChecked(upscaler_ == QLatin1String(preset.id));
+    upscalingGroup->addAction(action);
+    const QString id = QString::fromLatin1(preset.id);
+    connect(action, &QAction::triggered, this, [this, id]() { setUpscaler(id); });
+    if (id == QStringLiteral("off")) upscalingMenu->addSeparator();
+  }
   cpuUpscalingAction_ = experimentalMenu->addAction(tr("CPU upscaling (sharpen, no GPU needed)"));
   cpuUpscalingAction_->setCheckable(true);
   cpuUpscalingAction_->setChecked(cpuUpscalingEnabled_);
@@ -704,7 +753,8 @@ void MainWindow::showAboutDialog() {
   box.setText(tr("<h3>VCD Player</h3>"
                  "<p>A native Video CD player with full PBC (Playback Control) menu support.</p>"
                  "<p>Built with Qt %1 and libmpv.</p>"
-                 "<p>Experimental AI upscaling uses the Anime4K shaders by bloc97 (MIT License).</p>")
+                 "<p>Experimental GPU upscaling uses third-party mpv shaders: Anime4K, FSRCNNX, RAVU and AMD "
+                 "FidelityFX FSR/CAS (MIT and LGPL-3.0 licensed; see shaders/README.md).</p>")
                   .arg(QString::fromLatin1(QT_VERSION_STR)));
   QPushButton* reportButton = box.addButton(tr("Report an issue"), QMessageBox::ActionRole);
   box.addButton(QMessageBox::Ok);
@@ -722,16 +772,17 @@ void MainWindow::setRenderBackendSetting(const QString& value) {
                            tr("The new rendering setting will take effect the next time VCD Player starts."));
 }
 
-void MainWindow::setAiUpscalingEnabled(bool enabled) {
-  aiUpscalingEnabled_ = enabled;
-  QSettings().setValue(QStringLiteral("aiUpscaling"), enabled);
+void MainWindow::setUpscaler(const QString& id) {
+  if (id == upscaler_) return;
+  upscaler_ = id;
+  QSettings().setValue(QStringLiteral("upscaler"), id);
   // A plain mpv option, applied to the already-running instance right away
   // — no restart needed, unlike the render backend itself.
-  player_->setPropertyString("glsl-shaders", enabled ? AiUpscaleShaderPath() : QString());
-  if (enabled && player_->renderBackend() != MpvPlayer::RenderBackend::OpenGL) {
+  player_->setPropertyString("glsl-shaders", UpscalerShaderList(id));
+  if (id != QStringLiteral("off") && player_->renderBackend() != MpvPlayer::RenderBackend::OpenGL) {
     QMessageBox::information(
-        this, tr("AI upscaling"),
-        tr("AI upscaling only has an effect with the Hardware (GPU) rendering backend, which isn't active right "
+        this, tr("GPU upscaling"),
+        tr("GPU upscaling only has an effect with the Hardware (GPU) rendering backend, which isn't active right "
            "now. Switch to it from Advanced > Rendering and restart VCD Player."));
   }
 }

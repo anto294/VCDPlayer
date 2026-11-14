@@ -87,7 +87,8 @@ class MainWindow : public QMainWindow {
   // context rebuilt — but only has any visible effect while the Hardware
   // (OpenGL) backend is active, since it hooks into mpv's GPU shader
   // pipeline (see shaders/README.md and MpvPlayer::initRenderContext()).
-  void setAiUpscalingEnabled(bool enabled);
+  // id: one of the GPU upscaling presets (UpscalerPresets() in the .cpp).
+  void setUpscaler(const QString& id);
 
   // Also applies immediately. mpv's software renderer already scales with
   // Lanczos + full chroma interpolation by default (about as good as
@@ -126,7 +127,6 @@ class MainWindow : public QMainWindow {
   QAction* showProgressBarAction_ = nullptr;
   QAction* showTimeLabelAction_ = nullptr;
   QAction* showRemoteAction_ = nullptr;
-  QAction* aiUpscalingAction_ = nullptr;
   QAction* cpuUpscalingAction_ = nullptr;
 
   bool showRemote_ = true;
@@ -142,6 +142,6 @@ class MainWindow : public QMainWindow {
   QTranslator* translator_ = nullptr;
 
   QString renderBackendSetting_ = QStringLiteral("auto");
-  bool aiUpscalingEnabled_ = false;
+  QString upscaler_ = QStringLiteral("off");  // GPU upscaling preset id (see UpscalerPresets())
   bool cpuUpscalingEnabled_ = false;
 };
