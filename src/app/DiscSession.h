@@ -3,6 +3,7 @@
 #include <QObject>
 #include <QString>
 #include <QTimer>
+#include <QVariant>
 #include <functional>
 #include <memory>
 #include <optional>
@@ -54,7 +55,7 @@ class DiscSession : public QObject, public vcd::IPlaybackSink, public vcd::ITime
   void cancelTimeout(vcd::TimerId id) override;
   void cancelAllTimeouts();
 
-  void onMpvEndFile(int reason);
+  void onMpvPropertyChanged(const QString& name, const QVariant& value);
 
   // Translated, user-facing sentence for a disc-loading failure kind.
   static QString describe(vcd::DiscError::Code code);

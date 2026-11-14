@@ -1,7 +1,5 @@
 #include "DiscSession.h"
 
-#include <mpv/client.h>
-
 #include <stdexcept>
 
 #include "../core/DiscError.h"
@@ -21,7 +19,7 @@ DiscSession::DiscSession(MpvPlayer* player, QObject* parent) : QObject(parent), 
     });
   }
 
-  connect(player_, &MpvPlayer::endFile, this, &DiscSession::onMpvEndFile);
+  connect(player_, &MpvPlayer::propertyChanged, this, &DiscSession::onMpvPropertyChanged);
 }
 
 QString DiscSession::describe(vcd::DiscError::Code code) {
@@ -93,8 +91,8 @@ void DiscSession::play() { player_->setPropertyFlag("pause", false); }
 
 void DiscSession::pause() { player_->setPropertyFlag("pause", true); }
 
-// mpv reports this as end-file with reason STOP, not EOF, so onMpvEndFile
-// doesn't mistake it for the item finishing.
+// Unloads the item; that never sets eof-reached, so it isn't mistaken for
+// the item finishing.
 void DiscSession::stop() { player_->command({"stop"}); }
 
 DiscSession::PendingTimer& DiscSession::timerFor(vcd::TimerId id) {
@@ -118,6 +116,9 @@ void DiscSession::cancelAllTimeouts() {
   cancelTimeout(vcd::TimerId::DigitEntry);
 }
 
-void DiscSession::onMpvEndFile(int reason) {
-  if (reason == MPV_END_FILE_REASON_EOF && pbc_) pbc_->onEof();
+void DiscSession::onMpvPropertyChanged(const QString& name, const QVariant& value) {
+  // An item playing to its end: eof-reached, not end-file, because of
+  // keep-open=yes (see MpvPlayer's constructor). It goes back to false
+  // when the next item loads, so each item reports its end once.
+  if (name == QStringLiteral("eof-reached") && value.toBool() && pbc_) pbc_->onEof();
 }

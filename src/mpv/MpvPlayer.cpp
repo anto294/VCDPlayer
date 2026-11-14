@@ -83,6 +83,11 @@ MpvPlayer::MpvPlayer(QObject* parent) : QObject(parent) {
   observeProperty("duration", MPV_FORMAT_DOUBLE);
   observeProperty("volume", MPV_FORMAT_DOUBLE);
   observeProperty("mute", MPV_FORMAT_FLAG);
+  // With keep-open=yes (needed so a menu's still image stays on screen),
+  // mpv never sends end-file when a file plays to its end: it pauses on
+  // the last frame and flips eof-reached instead. That flag is therefore
+  // the only "item finished" signal (see DiscSession).
+  observeProperty("eof-reached", MPV_FORMAT_FLAG);
 }
 
 MpvPlayer::~MpvPlayer() {
