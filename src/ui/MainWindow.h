@@ -75,6 +75,12 @@ class MainWindow : public QMainWindow {
   void toggleFullscreen();
   void toggleAlwaysOnTop();
   void toggleMute();
+  // Karaoke discs put the vocals on one channel and the backing track on
+  // the other: "stereo", "left" or "right" (that channel on both
+  // speakers). Lasts for the session, not saved: a disc opened next time
+  // shouldn't silently start without its vocals.
+  void setAudioChannels(const QString& mode);
+  void addAudioChannelActions(QMenu* menu);
   void toggleRemotePanel();
   void setShowProgressBar(bool show);
   void setShowTimeLabel(bool show);
@@ -134,6 +140,7 @@ class MainWindow : public QMainWindow {
   QAction* showTimeLabelAction_ = nullptr;
   QAction* showRemoteAction_ = nullptr;
   QAction* cpuUpscalingAction_ = nullptr;
+  QMenu* audioChannelsMenu_ = nullptr;  // in the menu bar, kept in sync by setAudioChannels()
 
   bool showRemote_ = true;
   bool showProgressBarSetting_ = true;
@@ -150,4 +157,5 @@ class MainWindow : public QMainWindow {
   QString renderBackendSetting_ = QStringLiteral("auto");
   QString upscaler_ = QStringLiteral("off");  // GPU upscaling preset id (see UpscalerPresets())
   bool cpuUpscalingEnabled_ = false;
+  QString audioChannels_ = QStringLiteral("stereo");
 };

@@ -37,6 +37,7 @@
 #include <QVBoxLayout>
 #include <algorithm>
 #include <cmath>
+#include <utility>
 #include <vector>
 
 #include "../app/DiscSession.h"
@@ -491,6 +492,43 @@ void MainWindow::buildAudioMenu() {
   muteAction_->setCheckable(true);
   muteAction_->setShortcut(QKeySequence(QStringLiteral("M")));
   connect(muteAction_, &QAction::triggered, this, &MainWindow::toggleMute);
+  audioMenu->addSeparator();
+  audioChannelsMenu_ = audioMenu->addMenu(tr("Channels (karaoke)"));
+  addAudioChannelActions(audioChannelsMenu_);
+}
+
+void MainWindow::addAudioChannelActions(QMenu* menu) {
+  auto* group = new QActionGroup(menu);
+  group->setExclusive(true);
+  const std::pair<QString, QString> modes[] = {
+      {QStringLiteral("stereo"), tr("Stereo")},
+      {QStringLiteral("left"), tr("Left channel only")},
+      {QStringLiteral("right"), tr("Right channel only")},
+  };
+  for (const auto& [mode, label] : modes) {
+    QAction* action = menu->addAction(label);
+    action->setCheckable(true);
+    action->setChecked(audioChannels_ == mode);
+    action->setData(mode);
+    group->addAction(action);
+    connect(action, &QAction::triggered, this, [this, mode = mode]() { setAudioChannels(mode); });
+  }
+}
+
+void MainWindow::setAudioChannels(const QString& mode) {
+  audioChannels_ = mode;
+  // The chosen channel goes to both speakers, so a karaoke disc plays with
+  // or without its vocals instead of with them on one side only.
+  QString filter;
+  if (mode == QStringLiteral("left")) {
+    filter = QStringLiteral("lavfi=[pan=stereo|c0=c0|c1=c0]");
+  } else if (mode == QStringLiteral("right")) {
+    filter = QStringLiteral("lavfi=[pan=stereo|c0=c1|c1=c1]");
+  }
+  player_->setPropertyString("af", filter);
+  if (audioChannelsMenu_) {
+    for (QAction* action : audioChannelsMenu_->actions()) action->setChecked(action->data().toString() == mode);
+  }
 }
 
 void MainWindow::buildViewMenu() {
@@ -632,6 +670,8 @@ QMenu* MainWindow::buildContextMenu() {
   muteItem->setCheckable(true);
   muteItem->setChecked(player_->getProperty("mute").toBool());
   connect(muteItem, &QAction::triggered, this, &MainWindow::toggleMute);
+  audioMenu->addSeparator();
+  addAudioChannelActions(audioMenu->addMenu(tr("Channels (karaoke)")));
   menu->addSeparator();
 
   connect(menu->addAction(tr("Take screenshot")), &QAction::triggered, this, &MainWindow::takeScreenshot);
