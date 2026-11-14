@@ -16,7 +16,7 @@ jobs:
     name: Claude code review
     # Drafts aren't ready for review yet; they get one once marked ready.
     if: ${{ !github.event.pull_request.draft }}
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 20
     permissions:
       contents: read
