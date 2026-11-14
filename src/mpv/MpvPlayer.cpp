@@ -71,7 +71,12 @@ MpvPlayer::MpvPlayer(QObject* parent) : QObject(parent) {
   const int rc = mpv_initialize(mpv_);
   if (rc < 0) throw std::runtime_error(QString("mpv_initialize() failed: %1").arg(mpv_error_string(rc)).toStdString());
 
-  mpv_request_log_messages(mpv_, "v");
+  // Warnings and errors only by default: "v" (verbose) logs several lines
+  // per file load and every option change, all forwarded to stderr. Set
+  // VCDPLAYER_MPV_LOG=v (or debug, trace, ...) to get them back when
+  // diagnosing a playback problem.
+  const QByteArray logLevel = qgetenv("VCDPLAYER_MPV_LOG");
+  mpv_request_log_messages(mpv_, logLevel.isEmpty() ? "warn" : logLevel.constData());
   mpv_set_wakeup_callback(mpv_, &MpvPlayer::OnMpvEvent, this);
 
   observeProperty("time-pos", MPV_FORMAT_DOUBLE);

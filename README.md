@@ -126,6 +126,12 @@ clang-tidy -p build src/**/*.cpp   # needs a build/ configured with
                                     # -DCMAKE_EXPORT_COMPILE_COMMANDS=ON
 ```
 
+## Troubleshooting
+
+mpv only logs warnings and errors by default. To see its full log on
+stderr while diagnosing a playback problem, start VCD Player with
+`VCDPLAYER_MPV_LOG=v` (or `debug`) in the environment.
+
 ## License
 
 GPLv3 or later — see [LICENSE](LICENSE). This choice follows from linking
