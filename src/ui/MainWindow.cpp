@@ -667,6 +667,8 @@ void MainWindow::buildExperimentalMenu() {
 
 void MainWindow::buildInfoMenu() {
   auto* infoMenu = menuBar()->addMenu(tr("&Info"));
+  connect(infoMenu->addAction(tr("Disc information…")), &QAction::triggered, this, &MainWindow::showDiscInfoDialog);
+  infoMenu->addSeparator();
   QAction* aboutAction = infoMenu->addAction(tr("About VCD Player"));
   connect(aboutAction, &QAction::triggered, this, &MainWindow::showAboutDialog);
 }
@@ -983,6 +985,52 @@ void MainWindow::showAboutDialog() {
   if (box.clickedButton() == reportButton) {
     QDesktopServices::openUrl(QUrl(QStringLiteral("https://github.com/anto294/VCDPlayer/issues")));
   }
+}
+
+void MainWindow::showDiscInfoDialog() {
+  const vcd::LoadedDisc* disc = session_->disc();
+  if (!disc) {
+    QMessageBox::information(this, tr("Disc information"), tr("No disc is open."));
+    return;
+  }
+  auto text = [](const std::string& s) { return QString::fromStdString(s).trimmed().toHtmlEscaped(); };
+  auto row = [](const QString& label, const QString& value) {
+    return QStringLiteral("<tr><td style='padding-right:16px'><b>%1</b></td><td>%2</td></tr>").arg(label, value);
+  };
+
+  const vcd::VcdInfo& info = disc->info;
+  QString rows;
+  rows += row(tr("File"), QDir::toNativeSeparators(session_->cuePath()).toHtmlEscaped());
+  rows += row(tr("Volume"), text(disc->volumeId));
+  if (!text(info.album).isEmpty()) {
+    rows += row(tr("Album"), info.totalCds > 1
+                                 ? tr("%1 (disc %2 of %3)").arg(text(info.album)).arg(info.thisCd).arg(info.totalCds)
+                                 : text(info.album));
+  }
+  rows += row(tr("Format"), QStringLiteral("%1 %2.0").arg(text(info.id)).arg(info.versionMajor));
+  rows += row(tr("Playback control (PBC)"), info.pbcEnabled && !disc->psd.empty() ? tr("Yes") : tr("No"));
+
+  // Video track n is CD track n+1; lengths come from the MPEG timestamps.
+  QStringList tracks;
+  double total = 0;
+  bool allKnown = true;
+  for (const auto& [number, stream] : disc->trackStreams) {
+    allKnown = allKnown && stream.seconds >= 0;
+    total += std::max(0.0, stream.seconds);
+    tracks << tr("%1: %2").arg(number - 1).arg(stream.seconds >= 0 ? formatTime(stream.seconds) : QStringLiteral("?"));
+  }
+  rows += row(tr("Video tracks"), allKnown ? tr("%1 (total %2)").arg(disc->trackStreams.size()).arg(formatTime(total))
+                                           : QString::number(disc->trackStreams.size()));
+  rows += row(QString(), tracks.join(QStringLiteral("<br>")));
+  rows += row(tr("Chapters"), QString::number(disc->entriesFile.entries.size()));
+  rows += row(tr("Menu pictures and clips"), QString::number(disc->segmentStreams.size()));
+
+  QMessageBox box(this);
+  box.setWindowTitle(tr("Disc information"));
+  box.setTextFormat(Qt::RichText);
+  box.setText(QStringLiteral("<table>%1</table>").arg(rows));
+  box.setTextInteractionFlags(Qt::TextSelectableByMouse);
+  box.exec();
 }
 
 void MainWindow::setRenderBackendSetting(const QString& value) {

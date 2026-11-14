@@ -97,6 +97,7 @@ class MainWindow : public QMainWindow {
   void setShowTimeLabel(bool show);
   void takeScreenshot();
   void showAboutDialog();
+  void showDiscInfoDialog();
 
   // "auto"/"software"/"hardware", persisted and applied on next launch —
   // switching the render backend live mid-session isn't worth the risk
