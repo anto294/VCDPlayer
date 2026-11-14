@@ -53,6 +53,9 @@ class CdxaReader {
 
   void close();
 
+  // Number of whole 2352-byte sectors in the opened .bin file.
+  int64_t sectorCount() const { return sectorCount_; }
+
   // Reads the full raw sector (2352 bytes) at the given LBA into out (must
   // have at least kSectorSize bytes).
   void readSectorRaw(int64_t lba, uint8_t* out);
@@ -74,8 +77,13 @@ class CdxaReader {
   std::vector<uint8_t> readForm2Range(int64_t lba, int64_t count);
 
  private:
-  explicit CdxaReader(FILE* fp) : fp_(fp) {}
+  CdxaReader(FILE* fp, int64_t sectorCount) : fp_(fp), sectorCount_(sectorCount) {}
+
+  // Throws unless [lba, lba + count) lies entirely inside the .bin file.
+  void checkRange(int64_t lba, int64_t count) const;
+
   FILE* fp_ = nullptr;
+  int64_t sectorCount_ = 0;
 };
 
 }  // namespace vcd

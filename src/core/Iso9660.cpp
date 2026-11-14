@@ -47,6 +47,11 @@ PvdInfo readPvd(CdxaReader& reader, int64_t trackStartLba) {
 }
 
 std::vector<DirEntry> listDirectory(CdxaReader& reader, int64_t trackStartLba, int64_t dirLba, int64_t dirLen) {
+  // A Video CD's directories hold a handful of entries (SEGMENT/, the
+  // biggest, at most ~2000 ITEMnnnn.DAT records ≈ 100 KB); anything past
+  // this is a corrupt length, not a real directory.
+  constexpr int64_t kMaxDirectoryBytes = 1024 * 1024;
+  if (dirLen < 0 || dirLen > kMaxDirectoryBytes) throw std::runtime_error("ISO9660 directory size is corrupt.");
   const int64_t sectorCount = (dirLen + kForm1DataSize - 1) / kForm1DataSize;
   const std::vector<uint8_t> raw = reader.readForm1Range(trackStartLba + dirLba, sectorCount);
 

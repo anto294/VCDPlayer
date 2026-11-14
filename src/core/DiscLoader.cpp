@@ -12,6 +12,12 @@ namespace vcd {
 namespace {
 
 std::vector<uint8_t> readWholeFile(CdxaReader& reader, int64_t trackStartLba, const DirEntry& entry) {
+  // Only used for the small VCD/*.VCD metadata files (LOT.VCD is 64 KB,
+  // PSD.VCD at most 256 KB by spec): cap well above that so a corrupt
+  // length can't make us read most of the disc into memory.
+  constexpr int64_t kMaxMetadataFileBytes = 4 * 1024 * 1024;
+  if (entry.length > kMaxMetadataFileBytes)
+    throw std::runtime_error("VCD metadata file size is corrupt: " + entry.name);
   const int64_t sectorCount = (entry.length + kForm1DataSize - 1) / kForm1DataSize;
   std::vector<uint8_t> data = reader.readForm1Range(trackStartLba + entry.lba, sectorCount);
   data.resize(static_cast<size_t>(entry.length));

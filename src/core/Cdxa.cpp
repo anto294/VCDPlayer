@@ -19,19 +19,38 @@ int fseek64(FILE* fp, int64_t offset, int origin) {
 
 }  // namespace
 
+int64_t ftell64(FILE* fp) {
+#if defined(_WIN32)
+  return _ftelli64(fp);
+#else
+  return static_cast<int64_t>(ftello(fp));
+#endif
+}
+
 CdxaReader CdxaReader::open(const std::string& binPath) {
   FILE* fp = std::fopen(binPath.c_str(), "rb");
   if (!fp) throw std::runtime_error("Unable to open .bin file: " + binPath);
-  return CdxaReader(fp);
+  if (fseek64(fp, 0, SEEK_END) != 0) {
+    std::fclose(fp);
+    throw std::runtime_error("Unable to read the size of the .bin file: " + binPath);
+  }
+  const int64_t bytes = ftell64(fp);
+  std::rewind(fp);
+  return CdxaReader(fp, bytes > 0 ? bytes / kSectorSize : 0);
 }
 
-CdxaReader::CdxaReader(CdxaReader&& other) noexcept : fp_(other.fp_) { other.fp_ = nullptr; }
+CdxaReader::CdxaReader(CdxaReader&& other) noexcept : fp_(other.fp_), sectorCount_(other.sectorCount_) {
+  other.fp_ = nullptr;
+  other.sectorCount_ = 0;
+}
 
 CdxaReader& CdxaReader::operator=(CdxaReader&& other) noexcept {
   if (this != &other) {
     close();
     fp_ = other.fp_;
+    sectorCount_ = other.sectorCount_;
     other.fp_ = nullptr;
+    other.sectorCount_ = 0;
   }
   return *this;
 }
@@ -45,7 +64,18 @@ void CdxaReader::close() {
   }
 }
 
+void CdxaReader::checkRange(int64_t lba, int64_t count) const {
+  // lba/count are derived from LBAs and lengths stored on the disc itself,
+  // so they're checked against the real file size before anything gets
+  // allocated for them: a corrupt length can't turn into a multi-GB
+  // allocation or a read past the end of the image.
+  if (lba < 0 || count < 0 || lba > sectorCount_ || count > sectorCount_ - lba) {
+    throw std::runtime_error("Read beyond the end of the .bin file (corrupt or truncated image).");
+  }
+}
+
 void CdxaReader::readSectorRaw(int64_t lba, uint8_t* out) {
+  checkRange(lba, 1);
   if (fseek64(fp_, lba * kSectorSize, SEEK_SET) != 0) {
     throw std::runtime_error("Seek failed in .bin file.");
   }
@@ -80,6 +110,7 @@ const uint8_t* CdxaReader::payload(const uint8_t* sectorBuf, int* outSize) {
 }
 
 std::vector<uint8_t> CdxaReader::readForm1Range(int64_t lba, int64_t count) {
+  checkRange(lba, count);
   std::vector<uint8_t> out(static_cast<size_t>(count) * kForm1DataSize);
   std::vector<uint8_t> sector(kSectorSize);
   for (int64_t i = 0; i < count; i++) {
@@ -90,6 +121,7 @@ std::vector<uint8_t> CdxaReader::readForm1Range(int64_t lba, int64_t count) {
 }
 
 std::vector<uint8_t> CdxaReader::readForm2Range(int64_t lba, int64_t count) {
+  checkRange(lba, count);
   if (count == 0) return {};
   std::vector<uint8_t> raw(static_cast<size_t>(count) * kSectorSize);
   if (fseek64(fp_, lba * kSectorSize, SEEK_SET) != 0) {
