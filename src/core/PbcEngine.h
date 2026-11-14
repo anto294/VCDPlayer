@@ -82,6 +82,9 @@ class PbcEngine {
   void goTo(std::optional<int64_t> byteOffset);
   // Returns false if the item can't be played (none, unknown, unresolved).
   bool playItemRef(const ItemRef& ref);
+  // Playlist node: play its next item, or once all are done wait its
+  // delay and go to nextOfs.
+  void playNextPlaylistItem();
   // Selection node whose item finished playing: wait `totime`, then jump.
   void startSelectionWait();
   void playPlainTrack(int trackNumber);
@@ -100,6 +103,7 @@ class PbcEngine {
   std::optional<PsdDescriptor> currentDescriptor_;
   std::optional<int> plainTrack_;
   int selectionPlaysLeft_ = 1;  // -1 = loop forever
+  int playlistIndex_ = -1;      // item of the current playlist being played
   bool ended_ = false;
 };
 

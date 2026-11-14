@@ -68,8 +68,9 @@ void PbcEngine::goTo(std::optional<int64_t> byteOffset) {
   }
 
   if (d.type == PsdType::Playlist) {
-    playItemRef(d.items.empty() ? ItemRef{} : d.items[0].ref);
+    playlistIndex_ = -1;
     notify();
+    playNextPlaylistItem();
     return;
   }
 
@@ -80,6 +81,26 @@ void PbcEngine::goTo(std::optional<int64_t> byteOffset) {
   selectionPlaysLeft_ = loopCount == 0x7f ? -1 : std::max(1, loopCount);
   notify();
   if (!playItemRef(d.item.ref)) startSelectionWait();  // nothing to play: wait right away
+}
+
+void PbcEngine::playNextPlaylistItem() {
+  if (!currentDescriptor_ || currentDescriptor_->type != PsdType::Playlist) return;
+  const PsdDescriptor& d = *currentDescriptor_;
+  // Items that can't be resolved are skipped, like a player would.
+  while (++playlistIndex_ < static_cast<int>(d.items.size())) {
+    if (playItemRef(d.items[playlistIndex_].ref)) return;
+  }
+
+  // Whole list played: wait its "wait time" (same encoding as a selection's
+  // totime, 255 = until the user does something), then go to nextOfs.
+  const std::optional<int64_t> waitMs = totimeToMs(d.delayTime);
+  if (!waitMs || d.nextOfs.kind != PsdOfs::Kind::Offset) return;
+  const int64_t offset = d.nextOfs.byteOffset;
+  if (*waitMs == 0) {
+    goTo(offset);
+  } else {
+    timerHost_->scheduleTimeout(*waitMs, [this, offset]() { goTo(offset); });
+  }
 }
 
 void PbcEngine::startSelectionWait() {
@@ -150,7 +171,7 @@ void PbcEngine::onEof() {
   if (!currentDescriptor_) return;
   const PsdDescriptor& d = *currentDescriptor_;
   if (d.type == PsdType::Playlist) {
-    if (d.nextOfs.kind == PsdOfs::Kind::Offset) goTo(d.nextOfs.byteOffset);
+    playNextPlaylistItem();
     return;
   }
   if (d.type == PsdType::Selection) {
