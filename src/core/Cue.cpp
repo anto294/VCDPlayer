@@ -146,8 +146,9 @@ DiscImage imageLayout(const Disc& disc) {
   int64_t total = 0;
   for (const std::string& path : disc.files) {
     std::error_code ec;
-    const auto bytes = fs::file_size(path, ec);
-    if (ec) throw DiscError(DiscError::Code::BinUnreadable, "Unable to open .bin file: " + path);
+    const auto bytes = fs::file_size(pathFromUtf8(path), ec);
+    if (ec)
+      throw DiscError(DiscError::Code::BinUnreadable, "Unable to open .bin file: " + path + " (" + ec.message() + ")");
     fileStart.push_back(total);
     total += static_cast<int64_t>(bytes / kSectorSize);
   }
