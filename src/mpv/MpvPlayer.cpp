@@ -81,12 +81,16 @@ MpvPlayer::MpvPlayer(QObject* parent) : QObject(parent) {
 }
 
 MpvPlayer::~MpvPlayer() {
+  // For the OpenGL backend, libmpv requires its GL context to be current
+  // while the render context is freed (it deletes its own GL objects
+  // then), and so does deleting our FBO — so make it current first, before
+  // either, rather than after as before.
+  const bool glCurrent = glContext_ && glSurface_ && glContext_->makeCurrent(glSurface_);
   if (renderCtx_) mpv_render_context_free(renderCtx_);
-  if (mpv_) mpv_terminate_destroy(mpv_);
-  // The GL objects must go before the context that created them; making the
-  // context current one last time is what makes that destruction valid.
-  if (glContext_ && glSurface_) glContext_->makeCurrent(glSurface_);
   delete glFbo_;
+  if (glCurrent) glContext_->doneCurrent();
+  // The render context must be gone before the core it belongs to.
+  if (mpv_) mpv_terminate_destroy(mpv_);
   delete glContext_;
   delete glSurface_;
 }
