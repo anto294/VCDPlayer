@@ -111,6 +111,30 @@ Dettagli: %2</translation>
         <translation>&amp;Audio</translation>
     </message>
     <message>
+        <source>Off</source>
+        <translation>Disattivato</translation>
+    </message>
+    <message>
+        <source>Anime4K — cartoons (restore + upscale)</source>
+        <translation>Anime4K — cartoni animati (pulizia + upscaling)</translation>
+    </message>
+    <message>
+        <source>FSRCNNX — live action</source>
+        <translation>FSRCNNX — riprese dal vero</translation>
+    </message>
+    <message>
+        <source>RAVU — general purpose</source>
+        <translation>RAVU — uso generale</translation>
+    </message>
+    <message>
+        <source>AMD FSR — fast</source>
+        <translation>AMD FSR — veloce</translation>
+    </message>
+    <message>
+        <source>AMD CAS — sharpening only</source>
+        <translation>AMD CAS — solo nitidezza</translation>
+    </message>
+    <message>
         <source>Menu — choose %1–%2 with the number keys</source>
         <translation>Menu — scegli %1–%2 con i tasti numerici</translation>
     </message>
@@ -179,6 +203,10 @@ Dettagli: %2</translation>
         <translation>&amp;Lingua</translation>
     </message>
     <message>
+        <source>GPU upscaling</source>
+        <translation>Upscaling GPU</translation>
+    </message>
+    <message>
         <source>Audio</source>
         <translation>Audio</translation>
     </message>
@@ -211,10 +239,6 @@ Dettagli: %2</translation>
         <translation>Informazioni su VCD Player</translation>
     </message>
     <message>
-        <source>&lt;h3&gt;VCD Player&lt;/h3&gt;&lt;p&gt;A native Video CD player with full PBC (Playback Control) menu support.&lt;/p&gt;&lt;p&gt;Built with Qt %1 and libmpv.&lt;/p&gt;&lt;p&gt;Experimental AI upscaling uses the Anime4K shaders by bloc97 (MIT License).&lt;/p&gt;</source>
-        <translation>&lt;h3&gt;VCD Player&lt;/h3&gt;&lt;p&gt;Un lettore Video CD nativo con supporto completo ai menu PBC (Playback Control).&lt;/p&gt;&lt;p&gt;Realizzato con Qt %1 e libmpv.&lt;/p&gt;&lt;p&gt;L&apos;upscaling AI sperimentale usa gli shader Anime4K di bloc97 (licenza MIT).&lt;/p&gt;</translation>
-    </message>
-    <message>
         <source>Report an issue</source>
         <translation>Segnala un problema</translation>
     </message>
@@ -239,6 +263,10 @@ Dettagli: %2</translation>
         <translation>Hardware (GPU)</translation>
     </message>
     <message>
+        <source>&lt;h3&gt;VCD Player&lt;/h3&gt;&lt;p&gt;A native Video CD player with full PBC (Playback Control) menu support.&lt;/p&gt;&lt;p&gt;Built with Qt %1 and libmpv.&lt;/p&gt;&lt;p&gt;Experimental GPU upscaling uses third-party mpv shaders: Anime4K, FSRCNNX, RAVU and AMD FidelityFX FSR/CAS (MIT and LGPL-3.0 licensed; see shaders/README.md).&lt;/p&gt;</source>
+        <translation>&lt;h3&gt;VCD Player&lt;/h3&gt;&lt;p&gt;Un lettore Video CD nativo con supporto completo ai menu PBC (Playback Control).&lt;/p&gt;&lt;p&gt;Realizzato con Qt %1 e libmpv.&lt;/p&gt;&lt;p&gt;L&apos;upscaling GPU sperimentale usa shader mpv di terze parti: Anime4K, FSRCNNX, RAVU e AMD FidelityFX FSR/CAS (licenze MIT e LGPL-3.0; vedi shaders/README.md).&lt;/p&gt;</translation>
+    </message>
+    <message>
         <source>Restart required</source>
         <translation>Riavvio necessario</translation>
     </message>
@@ -251,20 +279,12 @@ Dettagli: %2</translation>
         <translation>&amp;Sperimentale</translation>
     </message>
     <message>
-        <source>AI upscaling (Anime4K, GPU)</source>
-        <translation>Upscaling AI (Anime4K, GPU)</translation>
-    </message>
-    <message>
-        <source>AI upscaling</source>
-        <translation>Upscaling AI</translation>
-    </message>
-    <message>
-        <source>AI upscaling only has an effect with the Hardware (GPU) rendering backend, which isn&apos;t active right now. Switch to it from Advanced &gt; Rendering and restart VCD Player.</source>
-        <translation>L&apos;upscaling AI ha effetto solo con il rendering Hardware (GPU), che al momento non è attivo. Passa a Hardware da Avanzate &gt; Rendering e riavvia VCD Player.</translation>
-    </message>
-    <message>
         <source>CPU upscaling (sharpen, no GPU needed)</source>
         <translation>Upscaling CPU (nitidezza, senza GPU)</translation>
+    </message>
+    <message>
+        <source>GPU upscaling only has an effect with the Hardware (GPU) rendering backend, which isn&apos;t active right now. Switch to it from Advanced &gt; Rendering and restart VCD Player.</source>
+        <translation>L&apos;upscaling GPU ha effetto solo con il rendering Hardware (GPU), che al momento non è attivo. Passa a Hardware da Avanzate &gt; Rendering e riavvia VCD Player.</translation>
     </message>
     <message>
         <source>CPU upscaling</source>
