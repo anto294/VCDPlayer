@@ -26,17 +26,18 @@ int64_t ReadCb(void* cookieRaw, char* buf, uint64_t nbytes) {
   auto* c = static_cast<StreamCookie*>(cookieRaw);
   if (c->pos >= c->totalBytes) return 0;
   const uint64_t remaining = std::min<uint64_t>(nbytes, static_cast<uint64_t>(c->totalBytes - c->pos));
+  if (remaining == 0) return 0;
   uint64_t written = 0;
   try {
-    while (written < remaining) {
-      const int64_t absPos = c->pos + static_cast<int64_t>(written);
-      const int64_t sectorIndex = absPos / kForm2DataSize;
-      const int64_t sectorByteOff = absPos % kForm2DataSize;
-      std::vector<uint8_t> sector = c->reader.readForm2Range(c->lba + sectorIndex, 1);
-      const uint64_t chunk = std::min<uint64_t>(remaining - written, kForm2DataSize - sectorByteOff);
-      std::memcpy(buf + written, sector.data() + sectorByteOff, chunk);
-      written += chunk;
-    }
+    // All the sectors covering [pos, pos + remaining) in one readForm2Range
+    // call (one seek + one fread per contiguous run in the image), instead
+    // of a seek and two allocations for every 2324-byte sector: mpv asks
+    // for tens of KB at a time.
+    const int64_t firstSector = c->pos / kForm2DataSize;
+    const int64_t lastSector = (c->pos + static_cast<int64_t>(remaining) - 1) / kForm2DataSize;
+    const std::vector<uint8_t> data = c->reader.readForm2Range(c->lba + firstSector, lastSector - firstSector + 1);
+    std::memcpy(buf, data.data() + (c->pos - firstSector * kForm2DataSize), remaining);
+    written = remaining;
   } catch (const std::exception&) {
     return -1;
   }
