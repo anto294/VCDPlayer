@@ -113,7 +113,7 @@ jobs:
           if-no-files-found: error
 
   linux-appimage:
-    name: Linux AppImage (${{ matrix.arch }})
+    name: Linux AppImage + .deb (${{ matrix.arch }})
     needs: matrix-config
     runs-on: ${{ matrix.os }}
     timeout-minutes: 20
@@ -175,10 +175,21 @@ jobs:
         run: |
           bash ci/package-appimage.sh build/VCDPlayer ${{ matrix.appimage_arch }} VCDPlayer-linux-${{ matrix.arch }}
 
+      # Same build, installed under /usr by CPack (see the install rules
+      # and CPACK_* settings in CMakeLists.txt); dpkg-shlibdeps fills in the
+      # library dependencies for this Ubuntu release.
+      - name: Package .deb
+        run: |
+          (cd build && cpack -G DEB)
+          mv build/vcdplayer_*.deb dist/VCDPlayer-linux-${{ matrix.arch }}.deb
+          dpkg-deb --info dist/VCDPlayer-linux-${{ matrix.arch }}.deb
+
       - uses: actions/upload-artifact@v7
         with:
           name: VCDPlayer-linux-${{ matrix.arch }}-appimage
-          path: dist/*.AppImage
+          path: |
+            dist/*.AppImage
+            dist/*.deb
           if-no-files-found: error
 
   macos:
@@ -238,7 +249,7 @@ jobs:
       - name: Collect release files
         run: |
           mkdir -p release
-          find artifacts -type f \( -name "*.zip" -o -name "*.AppImage" \) -exec cp {} release/ \;
+          find artifacts -type f \( -name "*.zip" -o -name "*.AppImage" -o -name "*.deb" -o -name "*.exe" -o -name "*.flatpak" \) -exec cp {} release/ \;
 
       # Pulls this tag's own section out of CHANGELOG.md (between its "##
       # [vX.Y.Z]" heading and the next one) so the release body is the

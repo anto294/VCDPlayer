@@ -154,4 +154,27 @@ if(UNIX AND NOT APPLE)
                 DESTINATION ${CMAKE_INSTALL_DATADIR}/icons/hicolor/${size}x${size}/apps
                 RENAME ${VCDPLAYER_APP_ID}.png)
     endforeach()
+
+    # `cpack -G DEB` in a configured build tree makes the .deb (CI builds it
+    # on Ubuntu 24.04, so it targets Ubuntu 24.04+ / Debian 13+). Library
+    # dependencies are worked out by dpkg-shlibdeps; the Qt platform plugins
+    # are loaded at runtime, so shlibdeps can't see them and they're added
+    # by hand.
+    set(CPACK_PACKAGE_NAME vcdplayer)
+    set(CPACK_PACKAGE_VENDOR anto294)
+    set(CPACK_PACKAGE_CONTACT "anto294 <anto294@users.noreply.github.com>")
+    set(CPACK_PACKAGE_DESCRIPTION_SUMMARY "Video CD player with full PBC menu support")
+    string(CONCAT CPACK_DEBIAN_PACKAGE_DESCRIPTION
+        "Plays Video CD disc images (.cue/.bin) like a hardware VCD player:\n"
+        "it follows the disc's own menus (PBC, Playback Control) through an\n"
+        "on-screen remote control, and also offers a chapter list, resume,\n"
+        "karaoke channel selection and optional GPU upscaling shaders.")
+    set(CPACK_DEBIAN_PACKAGE_SECTION video)
+    set(CPACK_DEBIAN_PACKAGE_HOMEPAGE https://github.com/anto294/VCDPlayer)
+    set(CPACK_DEBIAN_PACKAGE_SHLIBDEPS ON)
+    set(CPACK_DEBIAN_PACKAGE_DEPENDS "qt6-qpa-plugins")
+    set(CPACK_DEBIAN_PACKAGE_RECOMMENDS "qt6-wayland")
+    set(CPACK_DEBIAN_FILE_NAME DEB-DEFAULT)
+    set(CPACK_STRIP_FILES ON)
+    include(CPack)
 endif()
