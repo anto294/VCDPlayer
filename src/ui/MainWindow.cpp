@@ -21,6 +21,7 @@
 #include <QMenuBar>
 #include <QMessageBox>
 #include <QMimeData>
+#include <QProxyStyle>
 #include <QPushButton>
 #include <QResizeEvent>
 #include <QScreen>
@@ -102,6 +103,19 @@ class AspectRatioBox : public QWidget {
 
  private:
   QWidget* content_;
+};
+
+// Makes a left click on a QSlider's groove jump the handle straight to the
+// clicked spot (and start a drag from there), instead of Qt's default of
+// stepping one page towards it: for a seek bar, clicking somewhere means
+// "go there". Uses the application style as its base without owning it.
+class AbsoluteClickSliderStyle : public QProxyStyle {
+ public:
+  int styleHint(StyleHint hint, const QStyleOption* option, const QWidget* widget,
+                QStyleHintReturn* returnData) const override {
+    if (hint == QStyle::SH_Slider_AbsoluteSetButtons) return Qt::LeftButton;
+    return QProxyStyle::styleHint(hint, option, widget, returnData);
+  }
 };
 
 }  // namespace
@@ -224,6 +238,11 @@ MainWindow::MainWindow(QWidget* parent) : QMainWindow(parent) {
   timeCurrentLabel_->setStyleSheet("font-size: 12px; color: #b7b9c2;");
   seekBar_ = new QSlider(Qt::Horizontal, progressRow_);
   seekBar_->setRange(0, kSeekBarMax);
+  // Click-to-seek: the handle jumps to the click and the existing
+  // sliderReleased handler below performs the seek, as after a drag.
+  auto* seekBarStyle = new AbsoluteClickSliderStyle;
+  seekBarStyle->setParent(seekBar_);
+  seekBar_->setStyle(seekBarStyle);
   timeDurationLabel_ = new QLabel(QStringLiteral("00:00"), progressRow_);
   timeDurationLabel_->setStyleSheet("font-size: 12px; color: #b7b9c2;");
   progressLayout->addWidget(timeCurrentLabel_);
@@ -271,6 +290,9 @@ MainWindow::MainWindow(QWidget* parent) : QMainWindow(parent) {
           [this](int value) { player_->setPropertyDouble("volume", value); });
   connect(remote_, &RemotePanel::fullscreenToggled, this, &MainWindow::toggleFullscreen);
 
+  // Holding the handle (or, with click-to-seek, the spot just clicked)
+  // must stop time-pos updates from moving it until the release seeks.
+  connect(seekBar_, &QSlider::sliderPressed, this, [this]() { seekDragging_ = true; });
   connect(seekBar_, &QSlider::sliderMoved, this, [this](int value) {
     seekDragging_ = true;
     if (lastDuration_ > 0) timeCurrentLabel_->setText(formatTime((value / double(kSeekBarMax)) * lastDuration_));
