@@ -106,10 +106,31 @@ jobs:
         run: |
           bash ci/package-windows.sh build/VCDPlayer.exe VCDPlayer-windows-${{ matrix.arch }}-portable
 
+      # The same folder as the portable zip, as an Inno Setup installer
+      # (packaging/windows/VCDPlayer.iss): Start menu entry, uninstaller,
+      # .cue association. Inno Setup comes from Chocolatey when the runner
+      # image doesn't already have it.
+      - name: Build installer
+        shell: pwsh
+        run: |
+          $iscc = Get-ChildItem "${env:ProgramFiles(x86)}\Inno Setup*\ISCC.exe", "$env:ProgramFiles\Inno Setup*\ISCC.exe" -ErrorAction SilentlyContinue | Select-Object -First 1
+          if (-not $iscc) {
+            choco install innosetup -y --no-progress
+            $iscc = Get-ChildItem "${env:ProgramFiles(x86)}\Inno Setup*\ISCC.exe", "$env:ProgramFiles\Inno Setup*\ISCC.exe" -ErrorAction SilentlyContinue | Select-Object -First 1
+          }
+          if (-not $iscc) { throw "ISCC.exe not found" }
+          $version = (Select-String -Path CMakeLists.txt -Pattern 'project\(VCDPlayer VERSION ([0-9.]+)').Matches[0].Groups[1].Value
+          & $iscc.FullName "/DAppVersion=$version" "/DArch=${{ matrix.arch }}" `
+            "/DSourceDir=dist\VCDPlayer-windows-${{ matrix.arch }}-portable" `
+            "/DOutputName=VCDPlayer-windows-${{ matrix.arch }}-setup" packaging\windows\VCDPlayer.iss
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+
       - uses: actions/upload-artifact@v7
         with:
           name: VCDPlayer-windows-${{ matrix.arch }}-portable
-          path: dist/*.zip
+          path: |
+            dist/*.zip
+            dist/*.exe
           if-no-files-found: error
 
   linux-appimage:
