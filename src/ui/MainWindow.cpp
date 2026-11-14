@@ -775,8 +775,9 @@ void MainWindow::showAboutDialog() {
   box.setWindowTitle(tr("About VCD Player"));
   box.setIconPixmap(windowIcon().pixmap(64, 64));
   box.setTextFormat(Qt::RichText);
-  box.setText(tr("<h3>VCD Player</h3>"
-                 "<p>A native Video CD player with full PBC (Playback Control) menu support.</p>"
+  // The heading (name + version) isn't translatable text; the rest is.
+  box.setText(QStringLiteral("<h3>VCD Player %1</h3>").arg(QCoreApplication::applicationVersion()) +
+              tr("<p>A native Video CD player with full PBC (Playback Control) menu support.</p>"
                  "<p>Built with Qt %1 and libmpv.</p>"
                  "<p>Experimental GPU upscaling uses third-party mpv shaders: Anime4K, FSRCNNX, RAVU and AMD "
                  "FidelityFX FSR/CAS (MIT and LGPL-3.0 licensed; see shaders/README.md).</p>")

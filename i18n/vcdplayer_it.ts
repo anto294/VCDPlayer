@@ -263,10 +263,6 @@ Dettagli: %2</translation>
         <translation>Hardware (GPU)</translation>
     </message>
     <message>
-        <source>&lt;h3&gt;VCD Player&lt;/h3&gt;&lt;p&gt;A native Video CD player with full PBC (Playback Control) menu support.&lt;/p&gt;&lt;p&gt;Built with Qt %1 and libmpv.&lt;/p&gt;&lt;p&gt;Experimental GPU upscaling uses third-party mpv shaders: Anime4K, FSRCNNX, RAVU and AMD FidelityFX FSR/CAS (MIT and LGPL-3.0 licensed; see shaders/README.md).&lt;/p&gt;</source>
-        <translation>&lt;h3&gt;VCD Player&lt;/h3&gt;&lt;p&gt;Un lettore Video CD nativo con supporto completo ai menu PBC (Playback Control).&lt;/p&gt;&lt;p&gt;Realizzato con Qt %1 e libmpv.&lt;/p&gt;&lt;p&gt;L&apos;upscaling GPU sperimentale usa shader mpv di terze parti: Anime4K, FSRCNNX, RAVU e AMD FidelityFX FSR/CAS (licenze MIT e LGPL-3.0; vedi shaders/README.md).&lt;/p&gt;</translation>
-    </message>
-    <message>
         <source>Restart required</source>
         <translation>Riavvio necessario</translation>
     </message>
@@ -281,6 +277,10 @@ Dettagli: %2</translation>
     <message>
         <source>CPU upscaling (sharpen, no GPU needed)</source>
         <translation>Upscaling CPU (nitidezza, senza GPU)</translation>
+    </message>
+    <message>
+        <source>&lt;p&gt;A native Video CD player with full PBC (Playback Control) menu support.&lt;/p&gt;&lt;p&gt;Built with Qt %1 and libmpv.&lt;/p&gt;&lt;p&gt;Experimental GPU upscaling uses third-party mpv shaders: Anime4K, FSRCNNX, RAVU and AMD FidelityFX FSR/CAS (MIT and LGPL-3.0 licensed; see shaders/README.md).&lt;/p&gt;</source>
+        <translation>&lt;p&gt;Un lettore Video CD nativo con supporto completo ai menu PBC (Playback Control).&lt;/p&gt;&lt;p&gt;Realizzato con Qt %1 e libmpv.&lt;/p&gt;&lt;p&gt;L&apos;upscaling GPU sperimentale usa shader mpv di terze parti: Anime4K, FSRCNNX, RAVU e AMD FidelityFX FSR/CAS (licenze MIT e LGPL-3.0; vedi shaders/README.md).&lt;/p&gt;</translation>
     </message>
     <message>
         <source>GPU upscaling only has an effect with the Hardware (GPU) rendering backend, which isn&apos;t active right now. Switch to it from Advanced &gt; Rendering and restart VCD Player.</source>

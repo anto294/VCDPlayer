@@ -46,6 +46,7 @@ int main(int argc, char** argv) {
   // unaffected.
   std::setlocale(LC_NUMERIC, "C");
   app.setApplicationName("VCD Player");
+  app.setApplicationVersion(QStringLiteral(VCDPLAYER_VERSION));
   app.setOrganizationName("VCD Player");
   app.setWindowIcon(AppIcon());
 
