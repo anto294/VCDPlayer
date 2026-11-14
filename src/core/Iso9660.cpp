@@ -61,6 +61,14 @@ std::vector<DirEntry> listDirectory(CdxaReader& reader, int64_t trackStartLba, i
       off = nextSectorBoundary;
       continue;
     }
+    // recLen/nameLen come straight from the disc image: check that the
+    // record is at least a full fixed header (33 bytes + a 1-byte name),
+    // stays inside its own logical sector (as ISO9660 requires), and that
+    // its name fits inside it, before reading any field out of it.
+    constexpr size_t kMinRecordLen = 34;
+    const bool recordFits = recLen >= kMinRecordLen && (off % kForm1DataSize) + recLen <= kForm1DataSize &&
+                            off + recLen <= raw.size() && 33u + raw[off + 32] <= recLen;
+    if (!recordFits) throw std::runtime_error("ISO9660 directory record is corrupt.");
     const uint8_t flags = raw[off + 25];
     const uint8_t nameLen = raw[off + 32];
     const std::string rawName(reinterpret_cast<const char*>(raw.data() + off + 33), nameLen);

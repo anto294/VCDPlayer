@@ -1,6 +1,7 @@
 #include "PbcEngine.h"
 
 #include <algorithm>
+#include <exception>
 
 namespace vcd {
 
@@ -44,7 +45,17 @@ void PbcEngine::goTo(std::optional<int64_t> byteOffset) {
     end();
     return;
   }
-  const PsdDescriptor d = readPsdDescriptor(psd_, *byteOffset);
+  PsdDescriptor d;
+  try {
+    d = readPsdDescriptor(psd_, *byteOffset);
+  } catch (const std::exception&) {
+    // A corrupt PSD.VCD (offset past its end, truncated descriptor) can't
+    // be navigated any further. goTo() runs from UI/timer callbacks, where
+    // an exception would escape into the Qt event loop, so the disc just
+    // ends here like it would on a real player with an unreadable menu.
+    end();
+    return;
+  }
   currentDescriptor_ = d;
 
   if (d.type == PsdType::End) {
