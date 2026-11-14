@@ -11,6 +11,7 @@
 #include <QDropEvent>
 #include <QFileDialog>
 #include <QFileInfo>
+#include <QGuiApplication>
 #include <QHBoxLayout>
 #include <QKeyEvent>
 #include <QLabel>
@@ -20,6 +21,7 @@
 #include <QMimeData>
 #include <QPushButton>
 #include <QResizeEvent>
+#include <QScreen>
 #include <QSettings>
 #include <QSignalBlocker>
 #include <QSlider>
@@ -119,8 +121,15 @@ MainWindow::MainWindow(QWidget* parent) : QMainWindow(parent) {
   }
 
   updateWindowTitle();
-  resize(1155, 700);
-  setMinimumSize(1155, 700);
+  // Preferred size, shrunk to fit small screens: a fixed 1155x700 minimum
+  // didn't fit e.g. a 1366x768 laptop at 125% scaling (~1093x614 logical
+  // pixels). The real minimum now comes from the layout itself (remote
+  // panel + the video box's own minimum).
+  QSize initialSize(1155, 700);
+  if (const QScreen* screen = QGuiApplication::primaryScreen()) {
+    initialSize = initialSize.boundedTo(screen->availableGeometry().size() * 0.9);
+  }
+  resize(initialSize);
   setAcceptDrops(true);
 
   renderBackendSetting_ = QSettings().value(QStringLiteral("renderBackend"), QStringLiteral("auto")).toString();
