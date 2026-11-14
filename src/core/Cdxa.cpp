@@ -49,7 +49,7 @@ CdxaReader CdxaReader::open(const std::string& binPath) {
   if (fseek64(fp, 0, SEEK_END) != 0)
     throw DiscError(DiscError::Code::BinUnreadable, "Unable to read the size of the .bin file: " + binPath);
   const int64_t bytes = ftell64(fp);
-  std::rewind(fp);
+  if (fseek64(fp, 0, SEEK_SET) != 0) throw DiscError(DiscError::Code::BinUnreadable, "Seek failed in .bin file.");
   reader.regions_.push_back(ImageRegion{0, 0, 0, bytes > 0 ? bytes / kSectorSize : 0});
   return reader;
 }

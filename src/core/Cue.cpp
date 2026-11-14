@@ -164,6 +164,7 @@ DiscImage imageLayout(const Disc& disc) {
     int64_t gap;
   };
   std::vector<Split> splits;
+  splits.reserve(disc.files.size() + disc.tracks.size());
   for (size_t f = 0; f < disc.files.size(); f++) splits.push_back({fileStart[f], 0});
   for (size_t i = 1; i < disc.tracks.size(); i++) {
     const Track& t = disc.tracks[i];

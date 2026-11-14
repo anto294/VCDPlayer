@@ -83,7 +83,7 @@ void PbcEngine::goTo(std::optional<int64_t> byteOffset) {
   // Selection: its item plays `loop` times (low 7 bits; 0x7f = forever),
   // and only once it's done does the totime wait (and then the jump to
   // the timeout list) start.
-  const int loopCount = d.loop & 0x7f;
+  const int loopCount = static_cast<int>(static_cast<unsigned>(d.loop) & 0x7fu);
   selectionPlaysLeft_ = loopCount == 0x7f ? -1 : std::max(1, loopCount);
   notify();
   if (!playItemRef(d.item.ref)) startSelectionWait();  // nothing to play: wait right away

@@ -52,7 +52,7 @@ std::vector<DirEntry> listDirectory(CdxaReader& reader, int64_t dirLba, int64_t 
   // A Video CD's directories hold a handful of entries (SEGMENT/, the
   // biggest, at most ~2000 ITEMnnnn.DAT records ≈ 100 KB); anything past
   // this is a corrupt length, not a real directory.
-  constexpr int64_t kMaxDirectoryBytes = 1024 * 1024;
+  constexpr int64_t kMaxDirectoryBytes = int64_t{1024} * 1024;
   if (dirLen < 0 || dirLen > kMaxDirectoryBytes)
     throw DiscError(DiscError::Code::CorruptImage, "ISO9660 directory size is corrupt.");
   const int64_t sectorCount = (dirLen + kForm1DataSize - 1) / kForm1DataSize;
