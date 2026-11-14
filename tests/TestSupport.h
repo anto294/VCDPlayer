@@ -102,7 +102,8 @@ class TempDir {
   TempDir(const TempDir&) = delete;
   TempDir& operator=(const TempDir&) = delete;
 
-  std::string file(const std::string& name) const { return (path_ / name).string(); }
+  // UTF-8 path of `name` (itself UTF-8) inside the directory.
+  std::string file(const std::string& name) const { return vcd::pathToUtf8(path_ / vcd::pathFromUtf8(name)); }
 
  private:
   std::filesystem::path path_;

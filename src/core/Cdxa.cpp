@@ -1,6 +1,7 @@
 #include "Cdxa.h"
 
 #include <algorithm>
+#include <cerrno>
 #include <cstring>
 #include <stdexcept>
 #include <utility>
@@ -39,9 +40,12 @@ CdxaReader CdxaReader::open(const DiscImage& image) {
 #else
     FILE* fp = std::fopen(pathFromUtf8(path).c_str(), "rb");
 #endif
-    if (!fp)
+    if (!fp) {
+      // The system's reason (not found, access denied, ...) goes in the
+      // details. The reader's destructor closes the files already open.
       throw DiscError(DiscError::Code::BinUnreadable,
-                      "Unable to open .bin file: " + path);  // reader's dtor closes the others
+                      "Unable to open .bin file: " + path + " (" + std::strerror(errno) + ")");
+    }
     reader.files_.push_back(fp);
   }
   reader.regions_ = image.regions;

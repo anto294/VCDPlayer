@@ -82,12 +82,18 @@ TEST(cue_with_utf8_bom) {
 }
 
 TEST(cue_bin_name_case_and_windows_path) {
+  // The .bin found must be the file on disk, however the .cue spells it.
+  // Compared as files, not strings: on a case-insensitive filesystem
+  // (Windows) "DISC.BIN" is already the right name as written.
+  auto sameFile = [](const std::string& a, const std::string& b) {
+    return std::filesystem::equivalent(vcd::pathFromUtf8(a), vcd::pathFromUtf8(b));
+  };
   test::TempDir dir;
   test::Image(20).save(dir.file("disc.bin"));
   test::writeText(dir.file("a.cue"), "FILE \"DISC.BIN\" BINARY\n TRACK 01 MODE2/2352\n INDEX 01 00:00:00\n");
-  CHECK_EQ(vcd::parseCue(dir.file("a.cue")).files[0], dir.file("disc.bin"));
+  CHECK(sameFile(vcd::parseCue(dir.file("a.cue")).files[0], dir.file("disc.bin")));
   test::writeText(dir.file("b.cue"), "FILE \"C:\\rips\\Disc.Bin\" BINARY\n TRACK 01 MODE2/2352\n INDEX 01 00:00:00\n");
-  CHECK_EQ(vcd::parseCue(dir.file("b.cue")).files[0], dir.file("disc.bin"));
+  CHECK(sameFile(vcd::parseCue(dir.file("b.cue")).files[0], dir.file("disc.bin")));
 }
 
 TEST(cue_errors) {
