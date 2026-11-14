@@ -6,6 +6,7 @@
 
 class QAction;
 class QCloseEvent;
+class QEvent;
 class QDragEnterEvent;
 class QDropEvent;
 class QKeyEvent;
@@ -39,6 +40,7 @@ class MainWindow : public QMainWindow {
   void openDiscPath(const QString& cuePath);
 
  protected:
+  void changeEvent(QEvent* event) override;
   void closeEvent(QCloseEvent* event) override;
   void resizeEvent(QResizeEvent* event) override;
   void keyPressEvent(QKeyEvent* event) override;
@@ -50,6 +52,8 @@ class MainWindow : public QMainWindow {
   enum class ZoomDirection { In, Out, Reset };
 
   void buildMenuBar();
+  // Menu bar background/text from the application palette (see the .cpp).
+  void applyMenuBarColors();
   void buildFileMenu();
   void buildPlaybackMenu();
   void buildAudioMenu();

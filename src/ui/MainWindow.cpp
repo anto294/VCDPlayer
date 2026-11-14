@@ -2,6 +2,7 @@
 
 #include <QAction>
 #include <QActionGroup>
+#include <QApplication>
 #include <QCloseEvent>
 #include <QContextMenuEvent>
 #include <QCoreApplication>
@@ -410,6 +411,30 @@ void MainWindow::buildMenuBar() {
   for (QAction* action : menuBar()->findChildren<QAction*>()) {
     if (!action->shortcut().isEmpty()) addAction(action);
   }
+
+  applyMenuBarColors();
+}
+
+void MainWindow::applyMenuBarColors() {
+  // Breeze (KDE) gives the menu bar its own "Header" colours from the KDE
+  // colour scheme. When that scheme can't be read (AppImage/sandbox, a
+  // different XDG config dir, ...) it falls back to light Breeze header
+  // colours: dark text, while the bar itself still shows the window's dark
+  // background - so the menus became unreadable. Pin the bar to the
+  // application palette, the one every other widget here already uses.
+  const QPalette p = QApplication::palette();
+  menuBar()->setStyleSheet(
+      QStringLiteral("QMenuBar { background: %1; color: %2; }"
+                     "QMenuBar::item { background: transparent; padding: 4px 8px; }"
+                     "QMenuBar::item:selected, QMenuBar::item:pressed { background: %3; color: %4; }")
+          .arg(p.color(QPalette::Window).name(), p.color(QPalette::WindowText).name(),
+               p.color(QPalette::Highlight).name(), p.color(QPalette::HighlightedText).name()));
+}
+
+void MainWindow::changeEvent(QEvent* event) {
+  // Follow a system theme switch (light <-> dark) at runtime.
+  if (event->type() == QEvent::ApplicationPaletteChange) applyMenuBarColors();
+  QMainWindow::changeEvent(event);
 }
 
 void MainWindow::buildFileMenu() {
