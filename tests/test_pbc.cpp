@@ -393,3 +393,18 @@ TEST(resume_plain_track_and_reject_bogus_points) {
   CHECK(!fresh.engine.resume(bogus, 10));
   CHECK(fresh.host.loadedTracks.empty());
 }
+
+TEST(entry_item_past_its_track_is_unplayable) {
+  // A play list whose first item is ENTRIES.VCD entry 1 (item id 100 + n),
+  // pointing 50 sectors into a 10-sector track: skipped, not played as an
+  // empty stream; the next item plays.
+  vcd::EntriesFile bad;
+  bad.entries = {{.track = 2, .isoLba = 2050}};
+  PsdBuilder b;
+  b.playlist(0, {.items = {100, 3}});
+  FakeHost host;
+  PbcEngine engine(vcd::VcdInfo{}, bad, PsdBuilder::lot(), b.psd, tracks(), {}, &host, &host);
+  engine.start();
+  CHECK_EQ(host.loadedTracks.size(), size_t{1});
+  CHECK_EQ(host.lastTrack(), 3);
+}

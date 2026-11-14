@@ -168,6 +168,9 @@ bool PbcEngine::playItemRef(const ItemRef& itemRef) {
     const auto it = trackStreams_.find(entry.track);
     if (it == trackStreams_.end()) return false;
     const int64_t startSector = std::max<int64_t>(0, entry.isoLba - it->second.lba);
+    // An entry past the end of the track it names (inconsistent ENTRIES.VCD)
+    // would make an empty or negative-length stream: treat it as unplayable.
+    if (startSector >= it->second.sectorCount) return false;
     load(StreamRef{it->second.lba + startSector, it->second.sectorCount - startSector});
     return true;
   }
