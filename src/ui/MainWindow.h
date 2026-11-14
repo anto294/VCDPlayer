@@ -5,6 +5,7 @@
 #include "../core/PbcEngine.h"
 
 class QAction;
+class QCloseEvent;
 class QDragEnterEvent;
 class QDropEvent;
 class QKeyEvent;
@@ -37,6 +38,7 @@ class MainWindow : public QMainWindow {
   void openDiscPath(const QString& cuePath);
 
  protected:
+  void closeEvent(QCloseEvent* event) override;
   void resizeEvent(QResizeEvent* event) override;
   void keyPressEvent(QKeyEvent* event) override;
   void contextMenuEvent(QContextMenuEvent* event) override;
@@ -126,8 +128,8 @@ class MainWindow : public QMainWindow {
   QAction* cpuUpscalingAction_ = nullptr;
 
   bool showRemote_ = true;
-  bool showProgressBarSetting_ = false;
-  bool showTimeLabelSetting_ = false;
+  bool showProgressBarSetting_ = true;
+  bool showTimeLabelSetting_ = true;
 
   QString currentDiscTitle_;
   QString currentDiscFileName_;  // basename of the opened .cue, for the window title

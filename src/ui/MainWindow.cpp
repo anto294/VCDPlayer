@@ -2,6 +2,7 @@
 
 #include <QAction>
 #include <QActionGroup>
+#include <QCloseEvent>
 #include <QContextMenuEvent>
 #include <QCoreApplication>
 #include <QDebug>
@@ -130,11 +131,20 @@ MainWindow::MainWindow(QWidget* parent) : QMainWindow(parent) {
     initialSize = initialSize.boundedTo(screen->availableGeometry().size() * 0.9);
   }
   resize(initialSize);
+  // Restores the last session's size/position (and maximized state) over
+  // the default above; a no-op on first launch.
+  restoreGeometry(QSettings().value(QStringLiteral("window/geometry")).toByteArray());
   setAcceptDrops(true);
 
   renderBackendSetting_ = QSettings().value(QStringLiteral("renderBackend"), QStringLiteral("auto")).toString();
+  // View toggles persist across launches. Progress bar and time default to
+  // on: without them there's no visible position or way to seek at all.
+  showRemote_ = QSettings().value(QStringLiteral("view/remotePanel"), true).toBool();
+  showProgressBarSetting_ = QSettings().value(QStringLiteral("view/progressBar"), true).toBool();
+  showTimeLabelSetting_ = QSettings().value(QStringLiteral("view/timeLabel"), true).toBool();
 
   player_ = new MpvPlayer(this);
+  player_->setPropertyDouble("volume", QSettings().value(QStringLiteral("volume"), 100.0).toDouble());
   // "Automatic" is resolved once here, at startup, rather than re-probed
   // every launch inside MpvPlayer itself — keeps the (GL-context-creating)
   // detection probe next to the rest of the Advanced-settings UI instead of
@@ -393,14 +403,16 @@ void MainWindow::buildViewMenu() {
   viewMenu->addSeparator();
   showProgressBarAction_ = viewMenu->addAction(tr("Progress bar"));
   showProgressBarAction_->setCheckable(true);
+  showProgressBarAction_->setChecked(showProgressBarSetting_);
   connect(showProgressBarAction_, &QAction::triggered, this, &MainWindow::setShowProgressBar);
   showTimeLabelAction_ = viewMenu->addAction(tr("Time label"));
   showTimeLabelAction_->setCheckable(true);
+  showTimeLabelAction_->setChecked(showTimeLabelSetting_);
   connect(showTimeLabelAction_, &QAction::triggered, this, &MainWindow::setShowTimeLabel);
   viewMenu->addSeparator();
   showRemoteAction_ = viewMenu->addAction(tr("Remote panel"));
   showRemoteAction_->setCheckable(true);
-  showRemoteAction_->setChecked(true);
+  showRemoteAction_->setChecked(showRemote_);
   connect(showRemoteAction_, &QAction::triggered, this, &MainWindow::toggleRemotePanel);
 }
 
@@ -610,18 +622,21 @@ void MainWindow::toggleMute() {
 
 void MainWindow::toggleRemotePanel() {
   showRemote_ = !showRemote_;
+  QSettings().setValue(QStringLiteral("view/remotePanel"), showRemote_);
   if (showRemoteAction_) showRemoteAction_->setChecked(showRemote_);
   applyViewSettingsToUi();
 }
 
 void MainWindow::setShowProgressBar(bool show) {
   showProgressBarSetting_ = show;
+  QSettings().setValue(QStringLiteral("view/progressBar"), show);
   if (showProgressBarAction_) showProgressBarAction_->setChecked(show);
   applyViewSettingsToUi();
 }
 
 void MainWindow::setShowTimeLabel(bool show) {
   showTimeLabelSetting_ = show;
+  QSettings().setValue(QStringLiteral("view/timeLabel"), show);
   if (showTimeLabelAction_) showTimeLabelAction_->setChecked(show);
   applyViewSettingsToUi();
 }
@@ -816,6 +831,13 @@ void MainWindow::onMpvPropertyChanged(const QString& name, const QVariant& value
     remote_->setMuted(muted);
     if (muteAction_) muteAction_->setChecked(muted);
   }
+}
+
+void MainWindow::closeEvent(QCloseEvent* event) {
+  QSettings settings;
+  settings.setValue(QStringLiteral("window/geometry"), saveGeometry());
+  settings.setValue(QStringLiteral("volume"), player_->getProperty("volume").toDouble());
+  QMainWindow::closeEvent(event);
 }
 
 void MainWindow::resizeEvent(QResizeEvent* event) {
