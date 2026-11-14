@@ -68,8 +68,11 @@ bool DiscSession::openDiscPath(const QString& cuePath, QString* errorMessage) {
 
   emit discLoaded(QString::fromStdString(disc_->volumeId), disc_->info.pbcEnabled,
                   static_cast<int>(disc_->entriesFile.entries.size()));
-  pbc_->start();
   return true;
+}
+
+void DiscSession::start() {
+  if (pbc_) pbc_->start();
 }
 
 bool DiscSession::isIdle() const {

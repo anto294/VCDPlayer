@@ -54,6 +54,11 @@ constexpr int kLayoutSpacing = 10;
 constexpr int kPanelWidth = 224;      // remote panel column (its scroll area's fixed width)
 constexpr int kToggleRailWidth = 36;  // permanent slot for panelToggleButton_, see updateOverlayPositions()
 constexpr int kMaxRecentDiscs = 10;
+constexpr int kMaxResumePoints = 20;
+// Only worth resuming: a real video (not a still or a short clip), not
+// just started and not about to end.
+constexpr double kResumeMinDuration = 120;
+constexpr double kResumeMargin = 30;
 
 // mpv's software renderer defaults to zimg for the actual scale step
 // (sws-allow-zimg=yes by default) when it's compiled in, as it is here —
@@ -779,18 +784,85 @@ void MainWindow::fillRecentDiscsMenu(QMenu* menu) {
           []() { QSettings().remove(QStringLiteral("recentDiscs")); });
 }
 
-void MainWindow::openDiscPath(const QString& cuePath) {
-  remote_->setStatus(tr("Loading…"));
-  QString error;
-  if (session_->openDiscPath(cuePath, &error)) {
-    currentDiscFileName_ = QFileInfo(cuePath).fileName();
-    addRecentDisc(cuePath);
-  } else {
-    currentDiscFileName_.clear();
-    remote_->setStatus(QStringLiteral("—"));
-    QMessageBox::critical(this, tr("Error opening disc"), error);
+// The "resume" setting: one map per disc, most recent first, keyed by the
+// .cue's absolute path. Fields mirror vcd::PbcEngine::ResumePoint, plus
+// "time", the position within that stream in seconds.
+namespace {
+
+QVariantList loadResumeList() { return QSettings().value(QStringLiteral("resume")).toList(); }
+
+QVariantList withoutDisc(QVariantList list, const QString& path) {
+  list.erase(std::remove_if(list.begin(), list.end(),
+                            [&path](const QVariant& v) { return v.toMap().value(QStringLiteral("path")) == path; }),
+             list.end());
+  return list;
+}
+
+}  // namespace
+
+void MainWindow::saveResumePoint() {
+  if (!session_->disc()) return;
+  const QString path = QFileInfo(session_->cuePath()).absoluteFilePath();
+  QVariantList list = withoutDisc(loadResumeList(), path);
+
+  const std::optional<vcd::PbcEngine::ResumePoint> point = session_->resumePoint();
+  const double time = player_->getProperty("time-pos").toDouble();
+  const double duration = player_->getProperty("duration").toDouble();
+  // Anything else (a menu, stopped, the end, a still, the first or last
+  // moments of a video) means the disc was left on purpose: forget it.
+  if (point && duration >= kResumeMinDuration && time >= kResumeMargin && time <= duration - kResumeMargin) {
+    list.prepend(QVariantMap{
+        {QStringLiteral("path"), path},
+        {QStringLiteral("lba"), static_cast<qlonglong>(point->streamLba)},
+        {QStringLiteral("sectors"), static_cast<qlonglong>(point->streamSectors)},
+        {QStringLiteral("track"), point->plainTrack},
+        {QStringLiteral("psd"), static_cast<qlonglong>(point->psdOffset)},
+        {QStringLiteral("index"), point->playlistIndex},
+        {QStringLiteral("time"), time},
+    });
+    while (list.size() > kMaxResumePoints) list.removeLast();
   }
+  QSettings().setValue(QStringLiteral("resume"), list);
+}
+
+bool MainWindow::offerResume(const QString& cuePath) {
+  const QString path = QFileInfo(cuePath).absoluteFilePath();
+  for (const QVariant& v : loadResumeList()) {
+    const QVariantMap m = v.toMap();
+    if (m.value(QStringLiteral("path")).toString() != path) continue;
+    vcd::PbcEngine::ResumePoint point;
+    point.streamLba = m.value(QStringLiteral("lba")).toLongLong();
+    point.streamSectors = m.value(QStringLiteral("sectors")).toLongLong();
+    point.plainTrack = m.value(QStringLiteral("track")).toInt();
+    point.psdOffset = m.value(QStringLiteral("psd")).toLongLong();
+    point.playlistIndex = m.value(QStringLiteral("index")).toInt();
+    const double time = m.value(QStringLiteral("time")).toDouble();
+
+    const auto answer =
+        QMessageBox::question(this, tr("Resume playback"), tr("Resume where you left off (%1)?").arg(formatTime(time)),
+                              QMessageBox::Yes | QMessageBox::No, QMessageBox::Yes);
+    // Answered either way: the point is used up (closing the disc again
+    // saves a fresh one).
+    QSettings().setValue(QStringLiteral("resume"), withoutDisc(loadResumeList(), path));
+    return answer == QMessageBox::Yes && session_->resume(point, time);
+  }
+  return false;
+}
+
+void MainWindow::openDiscPath(const QString& cuePath) {
+  saveResumePoint();  // for the disc being replaced, if any
+  QString error;
+  if (!session_->openDiscPath(cuePath, &error)) {
+    // The disc open before (if any) is still loaded and playing: leave its
+    // title and status alone.
+    if (!session_->disc()) remote_->setStatus(QStringLiteral("—"));
+    QMessageBox::critical(this, tr("Error opening disc"), error);
+    return;
+  }
+  currentDiscFileName_ = QFileInfo(cuePath).fileName();
   updateWindowTitle();
+  addRecentDisc(cuePath);
+  if (!offerResume(cuePath)) session_->start();
 }
 
 void MainWindow::sendRemoteButton(vcd::RemoteButton btn, int number) { session_->sendRemoteButton(btn, number); }
@@ -1059,6 +1131,7 @@ void MainWindow::onMpvPropertyChanged(const QString& name, const QVariant& value
 }
 
 void MainWindow::closeEvent(QCloseEvent* event) {
+  saveResumePoint();
   QSettings settings;
   settings.setValue(QStringLiteral("window/geometry"), saveGeometry());
   settings.setValue(QStringLiteral("volume"), player_->getProperty("volume").toDouble());

@@ -27,9 +27,12 @@ class DiscSession : public QObject, public vcd::IPlaybackSink, public vcd::ITime
  public:
   explicit DiscSession(MpvPlayer* player, QObject* parent = nullptr);
 
-  // Opens a VCD disc from its .cue. On error returns false and fills
-  // errorMessage (if not nullptr) with a human-readable message.
+  // Opens a VCD disc from its .cue, ready for start() or resume(). On error
+  // returns false and fills errorMessage (if not nullptr) with a
+  // human-readable message.
   bool openDiscPath(const QString& cuePath, QString* errorMessage);
+  // Starts the open disc from the beginning (its PBC entry point).
+  void start();
 
   void sendRemoteButton(vcd::RemoteButton btn, int number = 0);
   bool hasDisc() const { return pbc_ != nullptr; }

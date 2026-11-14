@@ -71,6 +71,11 @@ class MainWindow : public QMainWindow {
   // successfully, most recent first ("recentDiscs" setting).
   void addRecentDisc(const QString& cuePath);
   void fillRecentDiscsMenu(QMenu* menu);
+  // Resume support: the open disc's playback position is saved (or
+  // forgotten, when not in the middle of a video) when it's closed, and
+  // offered back the next time it's opened. See saveResumePoint().
+  void saveResumePoint();
+  bool offerResume(const QString& cuePath);
   void sendRemoteButton(vcd::RemoteButton btn, int number = 0);
   // Space bar: Play if paused/stopped/ended, Pause if playing.
   void togglePlayPause();
