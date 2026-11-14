@@ -5,6 +5,8 @@
 #include <sstream>
 #include <stdexcept>
 
+#include "DiscError.h"
+
 namespace vcd {
 
 namespace {
@@ -35,7 +37,7 @@ std::string toUpperAscii(const std::string& s) {
 PvdInfo readPvd(CdxaReader& reader) {
   const std::vector<uint8_t> sector = reader.readForm1Range(kPvdLba, 1);
   if (sector[0] != 1 || std::string(reinterpret_cast<const char*>(sector.data() + 1), 5) != "CD001") {
-    throw std::runtime_error("ISO9660 Primary Volume Descriptor not found (invalid data track).");
+    throw DiscError(DiscError::Code::NotVideoCd, "ISO9660 Primary Volume Descriptor not found (invalid data track).");
   }
   PvdInfo info;
   info.systemId = trimAscii(sector.data() + 8, 32);
@@ -51,7 +53,8 @@ std::vector<DirEntry> listDirectory(CdxaReader& reader, int64_t dirLba, int64_t 
   // biggest, at most ~2000 ITEMnnnn.DAT records ≈ 100 KB); anything past
   // this is a corrupt length, not a real directory.
   constexpr int64_t kMaxDirectoryBytes = 1024 * 1024;
-  if (dirLen < 0 || dirLen > kMaxDirectoryBytes) throw std::runtime_error("ISO9660 directory size is corrupt.");
+  if (dirLen < 0 || dirLen > kMaxDirectoryBytes)
+    throw DiscError(DiscError::Code::CorruptImage, "ISO9660 directory size is corrupt.");
   const int64_t sectorCount = (dirLen + kForm1DataSize - 1) / kForm1DataSize;
   const std::vector<uint8_t> raw = reader.readForm1Range(dirLba, sectorCount);
 
@@ -73,7 +76,7 @@ std::vector<DirEntry> listDirectory(CdxaReader& reader, int64_t dirLba, int64_t 
     constexpr size_t kMinRecordLen = 34;
     const bool recordFits = recLen >= kMinRecordLen && (off % kForm1DataSize) + recLen <= kForm1DataSize &&
                             off + recLen <= raw.size() && 33u + raw[off + 32] <= recLen;
-    if (!recordFits) throw std::runtime_error("ISO9660 directory record is corrupt.");
+    if (!recordFits) throw DiscError(DiscError::Code::CorruptImage, "ISO9660 directory record is corrupt.");
     const uint8_t flags = raw[off + 25];
     const uint8_t nameLen = raw[off + 32];
     const std::string rawName(reinterpret_cast<const char*>(raw.data() + off + 33), nameLen);

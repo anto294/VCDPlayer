@@ -3,6 +3,7 @@
 #include <stdexcept>
 
 #include "Cue.h"
+#include "DiscError.h"
 
 namespace vcd {
 
@@ -14,7 +15,7 @@ namespace {
 // through this check, so no parser below indexes `buf` directly.
 void requireBytes(const std::vector<uint8_t>& buf, size_t off, size_t len, const char* what) {
   if (off > buf.size() || len > buf.size() - off) {
-    throw std::runtime_error(std::string(what) + " is truncated or corrupt.");
+    throw DiscError(DiscError::Code::CorruptImage, std::string(what) + " is truncated or corrupt.");
   }
 }
 
@@ -138,7 +139,7 @@ PsdDescriptor readPsdDescriptor(const std::vector<uint8_t>& buf, int64_t byteOff
   constexpr const char* kWhat = "VCD/PSD.VCD";
   // byteOffset comes from LOT.VCD or from another descriptor's prev/next/
   // return/choice field, so it's as untrusted as the bytes it points to.
-  if (byteOffset < 0) throw std::runtime_error("VCD/PSD.VCD: negative descriptor offset.");
+  if (byteOffset < 0) throw DiscError(DiscError::Code::CorruptImage, "VCD/PSD.VCD: negative descriptor offset.");
   const size_t o = static_cast<size_t>(byteOffset);
   const uint8_t type = readU8(buf, o, kWhat);
   PsdDescriptor d;

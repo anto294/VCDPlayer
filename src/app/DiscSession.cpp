@@ -4,6 +4,7 @@
 
 #include <stdexcept>
 
+#include "../core/DiscError.h"
 #include "../mpv/MpvPlayer.h"
 
 DiscSession::DiscSession(MpvPlayer* player, QObject* parent) : QObject(parent), player_(player) {
@@ -23,10 +24,34 @@ DiscSession::DiscSession(MpvPlayer* player, QObject* parent) : QObject(parent), 
   connect(player_, &MpvPlayer::endFile, this, &DiscSession::onMpvEndFile);
 }
 
+QString DiscSession::describe(vcd::DiscError::Code code) {
+  using Code = vcd::DiscError::Code;
+  switch (code) {
+    case Code::CueUnreadable:
+      return tr("The .cue file can't be opened.");
+    case Code::CueInvalid:
+      return tr("The .cue file isn't valid.");
+    case Code::BinUnreadable:
+      return tr("The disc image (.bin) is missing or can't be read. It must be in the same folder as the .cue.");
+    case Code::UnsupportedFormat:
+      return tr("This disc image format isn't supported.");
+    case Code::NotVideoCd:
+      return tr("This doesn't look like a Video CD.");
+    case Code::CorruptImage:
+      return tr("The disc image is damaged or incomplete.");
+  }
+  return {};
+}
+
 bool DiscSession::openDiscPath(const QString& cuePath, QString* errorMessage) {
   vcd::LoadedDisc loaded;
   try {
     loaded = vcd::loadDisc(cuePath.toStdString());
+  } catch (const vcd::DiscError& e) {
+    if (errorMessage) {
+      *errorMessage = tr("%1\n\nDetails: %2").arg(describe(e.code()), QString::fromStdString(e.detail()));
+    }
+    return false;
   } catch (const std::exception& e) {
     if (errorMessage) *errorMessage = QString::fromUtf8(e.what());
     return false;

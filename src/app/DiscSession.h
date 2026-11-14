@@ -7,6 +7,7 @@
 #include <memory>
 #include <optional>
 
+#include "../core/DiscError.h"
 #include "../core/DiscLoader.h"
 #include "../core/PbcEngine.h"
 #include "../mpv/VcdStreamProtocol.h"
@@ -54,6 +55,9 @@ class DiscSession : public QObject, public vcd::IPlaybackSink, public vcd::ITime
   void cancelAllTimeouts();
 
   void onMpvEndFile(int reason);
+
+  // Translated, user-facing sentence for a disc-loading failure kind.
+  static QString describe(vcd::DiscError::Code code);
 
   MpvPlayer* player_;
   vcd::VcdStreamRegistry registry_;

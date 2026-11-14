@@ -8,6 +8,8 @@
 #include <sstream>
 #include <stdexcept>
 
+#include "DiscError.h"
+
 namespace vcd {
 
 namespace fs = std::filesystem;
@@ -20,7 +22,7 @@ int64_t parseMsf(const std::string& str) {
   static const std::regex kMsfRe(R"(^\s*(\d+):(\d+):(\d+)\s*$)");
   std::smatch m;
   if (!std::regex_match(str, m, kMsfRe)) {
-    throw std::runtime_error("Invalid MSF timecode: \"" + str + "\"");
+    throw DiscError(DiscError::Code::CueInvalid, "Invalid MSF timecode: \"" + str + "\"");
   }
   return msfToLba(std::stoi(m[1]), std::stoi(m[2]), std::stoi(m[3]));
 }
@@ -70,7 +72,7 @@ std::string trim(const std::string& s) {
 
 Disc parseCue(const std::string& cuePath) {
   std::ifstream in(cuePath, std::ios::binary);
-  if (!in) throw std::runtime_error("Unable to open .cue file: " + cuePath);
+  if (!in) throw DiscError(DiscError::Code::CueUnreadable, "Unable to open .cue file: " + cuePath);
   std::stringstream buf;
   buf << in.rdbuf();
   std::string text = buf.str();
@@ -100,7 +102,7 @@ Disc parseCue(const std::string& cuePath) {
       continue;
     }
     if (std::regex_search(line, m, kTrackRe)) {
-      if (disc.files.empty()) throw std::runtime_error("TRACK before any FILE directive.");
+      if (disc.files.empty()) throw DiscError(DiscError::Code::CueInvalid, "TRACK before any FILE directive.");
       disc.tracks.push_back(Track{});
       currentTrack = &disc.tracks.back();
       currentTrack->number = std::stoi(m[1]);
@@ -110,24 +112,24 @@ Disc parseCue(const std::string& cuePath) {
       continue;
     }
     if (std::regex_search(line, m, kPregapRe)) {
-      if (!currentTrack) throw std::runtime_error("PREGAP outside of a TRACK.");
+      if (!currentTrack) throw DiscError(DiscError::Code::CueInvalid, "PREGAP outside of a TRACK.");
       currentTrack->pregap = parseMsf(m[1]);
       continue;
     }
     if (std::regex_search(line, m, kIndexRe)) {
-      if (!currentTrack) throw std::runtime_error("INDEX outside of a TRACK.");
+      if (!currentTrack) throw DiscError(DiscError::Code::CueInvalid, "INDEX outside of a TRACK.");
       currentTrack->indices[std::stoi(m[1])] = parseMsf(m[2]);
       continue;
     }
     // Other directives (CATALOG, FLAGS, ISRC, TITLE, PERFORMER, ...) ignored.
   }
 
-  if (disc.files.empty()) throw std::runtime_error("The .cue file has no FILE directive.");
-  if (disc.tracks.empty()) throw std::runtime_error("The .cue file has no tracks.");
+  if (disc.files.empty()) throw DiscError(DiscError::Code::CueInvalid, "The .cue file has no FILE directive.");
+  if (disc.tracks.empty()) throw DiscError(DiscError::Code::CueInvalid, "The .cue file has no tracks.");
 
   for (const auto& t : disc.tracks) {
     if (t.indices.find(1) == t.indices.end()) {
-      throw std::runtime_error("Track " + std::to_string(t.number) + ": missing INDEX 01.");
+      throw DiscError(DiscError::Code::CueInvalid, "Track " + std::to_string(t.number) + ": missing INDEX 01.");
     }
   }
 
@@ -144,7 +146,7 @@ DiscImage imageLayout(const Disc& disc) {
   for (const std::string& path : disc.files) {
     std::error_code ec;
     const auto bytes = fs::file_size(path, ec);
-    if (ec) throw std::runtime_error("Unable to open .bin file: " + path);
+    if (ec) throw DiscError(DiscError::Code::BinUnreadable, "Unable to open .bin file: " + path);
     fileStart.push_back(total);
     total += static_cast<int64_t>(bytes / kSectorSize);
   }

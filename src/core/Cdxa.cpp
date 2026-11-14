@@ -5,6 +5,8 @@
 #include <stdexcept>
 #include <utility>
 
+#include "DiscError.h"
+
 namespace vcd {
 
 namespace {
@@ -32,7 +34,9 @@ CdxaReader CdxaReader::open(const DiscImage& image) {
   CdxaReader reader;
   for (const std::string& path : image.files) {
     FILE* fp = std::fopen(path.c_str(), "rb");
-    if (!fp) throw std::runtime_error("Unable to open .bin file: " + path);  // reader's dtor closes the others
+    if (!fp)
+      throw DiscError(DiscError::Code::BinUnreadable,
+                      "Unable to open .bin file: " + path);  // reader's dtor closes the others
     reader.files_.push_back(fp);
   }
   reader.regions_ = image.regions;
@@ -42,7 +46,8 @@ CdxaReader CdxaReader::open(const DiscImage& image) {
 CdxaReader CdxaReader::open(const std::string& binPath) {
   CdxaReader reader = open(DiscImage{{binPath}, {}});
   FILE* fp = reader.files_.front();
-  if (fseek64(fp, 0, SEEK_END) != 0) throw std::runtime_error("Unable to read the size of the .bin file: " + binPath);
+  if (fseek64(fp, 0, SEEK_END) != 0)
+    throw DiscError(DiscError::Code::BinUnreadable, "Unable to read the size of the .bin file: " + binPath);
   const int64_t bytes = ftell64(fp);
   std::rewind(fp);
   reader.regions_.push_back(ImageRegion{0, 0, 0, bytes > 0 ? bytes / kSectorSize : 0});
@@ -74,7 +79,7 @@ const ImageRegion& CdxaReader::regionFor(int64_t lba) const {
     --it;
     if (lba < it->isoLba + it->count) return *it;
   }
-  throw std::runtime_error("Read beyond the end of the .bin file (corrupt or truncated image).");
+  throw DiscError(DiscError::Code::CorruptImage, "Read beyond the end of the .bin file (corrupt or truncated image).");
 }
 
 void CdxaReader::checkRange(int64_t lba, int64_t count) const {
@@ -82,7 +87,7 @@ void CdxaReader::checkRange(int64_t lba, int64_t count) const {
   // so they're checked against what the image really stores before
   // anything gets allocated for them: a corrupt length can't turn into a
   // multi-GB allocation or a read past the end of the image.
-  if (count < 0) throw std::runtime_error("Negative sector count (corrupt image).");
+  if (count < 0) throw DiscError(DiscError::Code::CorruptImage, "Negative sector count (corrupt image).");
   int64_t cur = lba;
   while (cur < lba + count) {
     const ImageRegion& r = regionFor(cur);
@@ -94,11 +99,11 @@ void CdxaReader::readSectorRaw(int64_t lba, uint8_t* out) {
   const ImageRegion& r = regionFor(lba);
   FILE* fp = files_.at(r.fileIndex);
   if (fseek64(fp, (r.fileLba + (lba - r.isoLba)) * kSectorSize, SEEK_SET) != 0) {
-    throw std::runtime_error("Seek failed in .bin file.");
+    throw DiscError(DiscError::Code::BinUnreadable, "Seek failed in .bin file.");
   }
   const size_t n = std::fread(out, 1, kSectorSize, fp);
   if (n != static_cast<size_t>(kSectorSize)) {
-    throw std::runtime_error("Incomplete read of CD-XA sector.");
+    throw DiscError(DiscError::Code::CorruptImage, "Incomplete read of CD-XA sector.");
   }
 }
 
@@ -148,11 +153,11 @@ std::vector<uint8_t> CdxaReader::readForm2Range(int64_t lba, int64_t count) {
     const int64_t n = std::min(count - done, r.isoLba + r.count - (lba + done));
     FILE* fp = files_.at(r.fileIndex);
     if (fseek64(fp, (r.fileLba + (lba + done - r.isoLba)) * kSectorSize, SEEK_SET) != 0) {
-      throw std::runtime_error("Seek failed in .bin file.");
+      throw DiscError(DiscError::Code::BinUnreadable, "Seek failed in .bin file.");
     }
     const size_t want = static_cast<size_t>(n) * kSectorSize;
     if (std::fread(raw.data() + done * kSectorSize, 1, want, fp) != want) {
-      throw std::runtime_error("Incomplete read in .bin file (readForm2Range).");
+      throw DiscError(DiscError::Code::CorruptImage, "Incomplete read in .bin file (readForm2Range).");
     }
     done += n;
   }
