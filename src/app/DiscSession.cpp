@@ -62,6 +62,10 @@ void DiscSession::play() { player_->setPropertyFlag("pause", false); }
 
 void DiscSession::pause() { player_->setPropertyFlag("pause", true); }
 
+// mpv reports this as end-file with reason STOP, not EOF, so onMpvEndFile
+// doesn't mistake it for the item finishing.
+void DiscSession::stop() { player_->command({"stop"}); }
+
 DiscSession::PendingTimer& DiscSession::timerFor(vcd::TimerId id) {
   return id == vcd::TimerId::DigitEntry ? digitEntryTimer_ : navigationTimer_;
 }

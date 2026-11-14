@@ -26,6 +26,7 @@ class IPlaybackSink {
   virtual void loadAndPlay(int64_t lba, int64_t sectorCount) = 0;
   virtual void play() = 0;
   virtual void pause() = 0;
+  virtual void stop() = 0;  // stop and unload the current item
 };
 
 // Abstracts the engine's one-shot timers. Each TimerId is independent;
@@ -42,9 +43,9 @@ class ITimerHost {
   virtual void cancelTimeout(TimerId id) = 0;
 };
 
-// Input from the "remote control". Stop has no dedicated case in the state
-// machine (already true in the original version): it stays a no-op,
-// exposed only for completeness of the user-facing interface.
+// Input from the "remote control". Stop halts playback and leaves the disc
+// in the Stopped state; Play from Stopped (or from End) restarts it from
+// the beginning, like a hardware player.
 enum class RemoteButton { Number, Next, Prev, Return, Play, Pause, Stop };
 
 // PBC (Playback Control) state machine: interprets the PSD.VCD descriptors
@@ -57,7 +58,7 @@ enum class RemoteButton { Number, Next, Prev, Return, Play, Pause, Stop };
 class PbcEngine {
  public:
   struct State {
-    enum class Kind { Loading, Playing, Menu, End };
+    enum class Kind { Loading, Playing, Menu, End, Stopped };
     Kind kind = Kind::Loading;
     int choiceCount = 0;
     int firstChoice = 1;  // number of the first choice (the node's bsn)
@@ -115,6 +116,7 @@ class PbcEngine {
   int playlistIndex_ = -1;      // item of the current playlist being played
   int pendingNumber_ = -1;      // menu number typed so far (-1 = none)
   bool ended_ = false;
+  bool stopped_ = false;
 };
 
 }  // namespace vcd

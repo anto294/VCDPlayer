@@ -277,6 +277,9 @@ MainWindow::MainWindow(QWidget* parent) : QMainWindow(parent) {
       case Kind::Menu:
         status = tr("Menu — choose %1–%2 with the number keys").arg(firstChoice).arg(firstChoice + choiceCount - 1);
         break;
+      case Kind::Stopped:
+        status = tr("Stopped");
+        break;
       case Kind::Playing:
         status = tr("Playing");
         break;

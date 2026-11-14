@@ -34,7 +34,7 @@ class DiscSession : public QObject, public vcd::IPlaybackSink, public vcd::ITime
 
  signals:
   void discLoaded(QString volumeId, bool pbcEnabled, int chapters);
-  // kind: vcd::PbcEngine::State::Kind converted to int (Loading=0, Playing=1, Menu=2, End=3).
+  // kind: vcd::PbcEngine::State::Kind converted to int (Loading=0, Playing=1, Menu=2, End=3, Stopped=4).
   // firstChoice: number of the first menu choice (choices are numbered
   // firstChoice .. firstChoice + choiceCount - 1).
   void stateChanged(int kind, int choiceCount, int firstChoice);
@@ -44,6 +44,7 @@ class DiscSession : public QObject, public vcd::IPlaybackSink, public vcd::ITime
   void loadAndPlay(int64_t lba, int64_t sectorCount) override;
   void play() override;
   void pause() override;
+  void stop() override;
 
   // vcd::ITimerHost
   void scheduleTimeout(vcd::TimerId id, int64_t ms, std::function<void()> cb) override;

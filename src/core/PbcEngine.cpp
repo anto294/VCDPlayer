@@ -20,6 +20,10 @@ PbcEngine::PbcEngine(VcdInfo info, EntriesFile entriesFile, std::vector<uint8_t>
 bool PbcEngine::pbcAvailable() const { return !lot_.empty() && !psd_.empty(); }
 
 void PbcEngine::start() {
+  ended_ = false;
+  stopped_ = false;
+  currentDescriptor_.reset();
+  plainTrack_.reset();
   if (pbcAvailable()) {
     goTo(lotPsdByteOffset(lot_, 1, info_.offsetMultiplier));
   } else {
@@ -222,7 +226,22 @@ void PbcEngine::onRemoteButton(RemoteButton btn, int number) {
     return;
   }
   if (btn == RemoteButton::Play) {
-    sink_->play();
+    if (stopped_ || ended_) {
+      start();
+    } else {
+      sink_->play();
+    }
+    return;
+  }
+  if (btn == RemoteButton::Stop) {
+    timerHost_->cancelTimeout(TimerId::Navigation);
+    timerHost_->cancelTimeout(TimerId::DigitEntry);
+    pendingNumber_ = -1;
+    currentDescriptor_.reset();
+    plainTrack_.reset();
+    stopped_ = true;
+    sink_->stop();
+    notify();
     return;
   }
   if (btn == RemoteButton::Pause) {
@@ -253,6 +272,7 @@ void PbcEngine::notify() {
 }
 
 PbcEngine::State PbcEngine::state() const {
+  if (stopped_) return State{State::Kind::Stopped, 0};
   if (ended_) return State{State::Kind::End, 0};
   if (!currentDescriptor_) return State{State::Kind::Loading, 0};
   if (currentDescriptor_->type == PsdType::Selection && !currentDescriptor_->choices.empty()) {
