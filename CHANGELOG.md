@@ -10,8 +10,42 @@ Notable changes to VCD Player, release by release. Format loosely follows
 - CI: CodeQL security analysis (every push/PR plus a weekly rescan),
   shellcheck for the `ci/` packaging scripts, and an optional automated
   PR review workflow (enabled by an `ANTHROPIC_API_KEY` secret).
+- Disc images split into one `.bin` per track (multi-`FILE` `.cue`).
+- Multi-digit menu numbers (menus with 10+ choices) and support for menus
+  numbered from a base other than 1.
+- Working Stop button; Play after Stop or at the end of the disc restarts
+  it. Space toggles play/pause; clicking the seek bar jumps there.
+- View toggles, volume and window size/position are remembered; the
+  progress bar and time are shown by default.
+- The UI starts in Italian on Italian systems.
+- Unit tests for the disc-reading core, run in CI under ASan/UBSan.
+
+### Changed
+
+- The window can be made much smaller (the remote panel scrolls when it
+  doesn't fit), so it fits small or scaled laptop screens.
+- Disc loading errors are shown in the UI language, with technical details
+  underneath.
 
 ### Fixed
+
+- PBC never advanced on its own: films didn't return to the menu, menu
+  timeouts and play lists never moved on.
+- Every video track started 2 seconds late and ran 2 seconds into the next
+  one (and chapter points were off by as much) on images whose `.cue` has a
+  `PREGAP`.
+- Menus and play lists now follow the VCD timing rules: an item's repeat
+  count, the wait before a timeout jumps, every item of a play list (only
+  the first was played), and "play then continue" nodes that stopped
+  playback instead of returning to the menu.
+- Hardware (OpenGL) rendering showed the video upside down.
+- Keyboard shortcuts stopped working in fullscreen.
+- The picture stayed on screen after Stop.
+- Corrupt or crafted disc images could crash the player or make it read
+  past its buffers; they are now rejected with an error.
+- `.cue` files saved with a UTF-8 BOM, naming the `.bin` with different
+  case, or with a Windows path, failed to open; unsupported sector formats
+  (e.g. `MODE2/2336`) are now reported instead of playing garbage.
 
 - Linux/macOS: crash at startup (`mpv_create() failed`) on systems with a
   non-English locale that uses a decimal comma (Italian, German, French,
