@@ -127,7 +127,7 @@ class MprisPlayerAdaptor : public QDBusAbstractAdaptor {
   void PlayPause() { emit mpris_->playPauseRequested(); }
   void Stop() { emit mpris_->stopRequested(); }
   void Play() { emit mpris_->playRequested(); }
-  void Seek(qlonglong offsetMicroseconds) { emit mpris_->seekRequested(offsetMicroseconds / 1e6); }
+  void Seek(qlonglong offsetMicroseconds) { emit mpris_->seekRequested(static_cast<double>(offsetMicroseconds) / 1e6); }
   void SetPosition(const QDBusObjectPath& trackId, qlonglong positionMicroseconds);
   void OpenUri(const QString&) {}
 

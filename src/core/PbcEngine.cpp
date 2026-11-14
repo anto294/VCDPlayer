@@ -2,6 +2,7 @@
 
 #include <algorithm>
 #include <exception>
+#include <utility>
 
 namespace vcd {
 
@@ -388,7 +389,7 @@ bool PbcEngine::resume(const ResumePoint& p, double startSeconds) {
     plainTrack_ = p.plainTrack;
   } else {
     plainTrack_.reset();
-    currentDescriptor_ = d;
+    currentDescriptor_ = std::move(d);
     currentOffset_ = p.psdOffset;
     playlistIndex_ = p.playlistIndex;
     // Resuming plays the item once more at most; its loop count restarts.

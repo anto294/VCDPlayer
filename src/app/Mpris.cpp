@@ -92,5 +92,5 @@ void MprisPlayerAdaptor::SetPosition(const QDBusObjectPath& trackId, qlonglong p
   // Ignored unless it's about the item playing now, per the spec.
   const QVariant current = mpris_->metadata().value(QStringLiteral("mpris:trackid"));
   if (!current.isValid() || current.value<QDBusObjectPath>() != trackId) return;
-  emit mpris_->setPositionRequested(positionMicroseconds / 1e6);
+  emit mpris_->setPositionRequested(static_cast<double>(positionMicroseconds) / 1e6);
 }
