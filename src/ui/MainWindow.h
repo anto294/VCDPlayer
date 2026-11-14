@@ -60,6 +60,8 @@ class MainWindow : public QMainWindow {
 
   void openDiscDialog();
   void sendRemoteButton(vcd::RemoteButton btn, int number = 0);
+  // Space bar: Play if paused/stopped/ended, Pause if playing.
+  void togglePlayPause();
 
   void applyZoom(ZoomDirection direction);
   void toggleFullscreen();

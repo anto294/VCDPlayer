@@ -315,8 +315,10 @@ void MainWindow::buildFileMenu() {
 
 void MainWindow::buildPlaybackMenu() {
   auto* playbackMenu = menuBar()->addMenu(tr("&Playback"));
+  QAction* playPauseAction = playbackMenu->addAction(tr("Play/Pause"));
+  playPauseAction->setShortcut(QKeySequence(Qt::Key_Space));
+  connect(playPauseAction, &QAction::triggered, this, &MainWindow::togglePlayPause);
   QAction* playAction = playbackMenu->addAction(tr("Play"));
-  playAction->setShortcut(QKeySequence(Qt::Key_Space));
   connect(playAction, &QAction::triggered, this, [this]() { sendRemoteButton(vcd::RemoteButton::Play); });
   QAction* pauseAction = playbackMenu->addAction(tr("Pause"));
   connect(pauseAction, &QAction::triggered, this, [this]() { sendRemoteButton(vcd::RemoteButton::Pause); });
@@ -551,6 +553,11 @@ void MainWindow::openDiscPath(const QString& cuePath) {
 }
 
 void MainWindow::sendRemoteButton(vcd::RemoteButton btn, int number) { session_->sendRemoteButton(btn, number); }
+
+void MainWindow::togglePlayPause() {
+  const bool resume = session_->isIdle() || player_->getProperty("pause").toBool();
+  sendRemoteButton(resume ? vcd::RemoteButton::Play : vcd::RemoteButton::Pause);
+}
 
 void MainWindow::applyZoom(ZoomDirection direction) {
   switch (direction) {

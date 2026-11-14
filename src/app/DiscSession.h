@@ -31,6 +31,8 @@ class DiscSession : public QObject, public vcd::IPlaybackSink, public vcd::ITime
 
   void sendRemoteButton(vcd::RemoteButton btn, int number = 0);
   bool hasDisc() const { return pbc_ != nullptr; }
+  // Stopped or at the end of the disc: Play restarts it rather than resuming.
+  bool isIdle() const;
 
  signals:
   void discLoaded(QString volumeId, bool pbcEnabled, int chapters);

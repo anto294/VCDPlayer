@@ -48,6 +48,12 @@ bool DiscSession::openDiscPath(const QString& cuePath, QString* errorMessage) {
   return true;
 }
 
+bool DiscSession::isIdle() const {
+  if (!pbc_) return true;
+  const auto kind = pbc_->state().kind;
+  return kind == vcd::PbcEngine::State::Kind::Stopped || kind == vcd::PbcEngine::State::Kind::End;
+}
+
 void DiscSession::sendRemoteButton(vcd::RemoteButton btn, int number) {
   if (pbc_) pbc_->onRemoteButton(btn, number);
 }
