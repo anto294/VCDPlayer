@@ -482,6 +482,30 @@ void MainWindow::buildPlaybackMenu() {
   QAction* menuAction = playbackMenu->addAction(tr("Disc menu"));
   menuAction->setShortcut(QKeySequence(QStringLiteral("Ctrl+Alt+Up")));
   connect(menuAction, &QAction::triggered, this, [this]() { sendRemoteButton(vcd::RemoteButton::Return); });
+  QMenu* chapterMenu = playbackMenu->addMenu(tr("Go to chapter"));
+  connect(chapterMenu, &QMenu::aboutToShow, this, [this, chapterMenu]() { fillChapterMenu(chapterMenu); });
+}
+
+void MainWindow::fillChapterMenu(QMenu* menu) {
+  menu->clear();
+  const vcd::LoadedDisc* disc = session_->disc();
+  if (!disc || disc->entriesFile.entries.empty()) {
+    menu->addAction(tr("No chapters"))->setEnabled(false);
+    return;
+  }
+  const std::vector<vcd::EntriesEntry>& entries = disc->entriesFile.entries;
+  for (size_t i = 0; i < entries.size(); i++) {
+    const vcd::EntriesEntry& entry = entries[i];
+    // Where the chapter starts within its video track: CD sectors play at
+    // 75 per second. CD track 1 is the data track, so video track n is CD
+    // track n+1 (MPEGAV/AVSEQ0n.DAT).
+    const auto track = disc->trackStreams.find(entry.track);
+    const double offset = track == disc->trackStreams.end() ? 0.0 : (entry.isoLba - track->second.lba) / 75.0;
+    QAction* action = menu->addAction(
+        tr("Chapter %1  (track %2, %3)").arg(i + 1).arg(entry.track - 1).arg(formatTime(std::max(0.0, offset))));
+    const int index = static_cast<int>(i);
+    connect(action, &QAction::triggered, this, [this, index]() { session_->jumpToChapter(index); });
+  }
 }
 
 void MainWindow::buildAudioMenu() {
@@ -665,6 +689,7 @@ QMenu* MainWindow::buildContextMenu() {
           [this]() { sendRemoteButton(vcd::RemoteButton::Prev); });
   connect(menu->addAction(tr("Disc menu")), &QAction::triggered, this,
           [this]() { sendRemoteButton(vcd::RemoteButton::Return); });
+  fillChapterMenu(menu->addMenu(tr("Go to chapter")));
   menu->addSeparator();
 
   auto* audioMenu = menu->addMenu(tr("Audio"));
