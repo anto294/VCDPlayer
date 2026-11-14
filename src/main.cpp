@@ -53,12 +53,14 @@ int main(int argc, char** argv) {
   MainWindow window;
   window.show();
 
-  if (argc > 1) {
-    // Enables `VCDPlayer.exe path\to\disc.cue` (drag&drop from Explorer,
-    // "open with", or manual command-line launch).
+  // Enables `VCDPlayer path/to/disc.cue`: double-click on an associated
+  // .cue, "open with", drag&drop onto the executable, or the command line.
+  // arguments() rather than argv: on Windows it comes from the UTF-16
+  // command line, so paths outside the ANSI code page survive.
+  const QStringList args = QCoreApplication::arguments();
+  if (args.size() > 1) {
     QMetaObject::invokeMethod(
-        &window, [&window, path = QString::fromLocal8Bit(argv[1])]() { window.openDiscPath(path); },
-        Qt::QueuedConnection);
+        &window, [&window, path = args.at(1)]() { window.openDiscPath(path); }, Qt::QueuedConnection);
   }
 
   return app.exec();
