@@ -205,6 +205,19 @@ jobs:
           mv build/vcdplayer_*.deb dist/VCDPlayer-linux-${{ matrix.arch }}.deb
           dpkg-deb --info dist/VCDPlayer-linux-${{ matrix.arch }}.deb
 
+      # Installs the .deb the way a user would and starts the app headless
+      # for a few seconds: catches missing dependencies, files in the wrong
+      # place, and crashes at startup (mpv init, shader lookup).
+      - name: Check the .deb installs and starts
+        run: |
+          sudo apt-get install -y ./dist/VCDPlayer-linux-${{ matrix.arch }}.deb
+          if ldd /usr/bin/VCDPlayer | grep "not found"; then exit 1; fi
+          test -f /usr/share/vcdplayer/shaders/FSR.glsl
+          desktop-file-validate /usr/share/applications/io.github.anto294.VCDPlayer.desktop
+          status=0
+          QT_QPA_PLATFORM=offscreen timeout 5 /usr/bin/VCDPlayer || status=$?
+          if [ "$status" -ne 124 ]; then echo "VCDPlayer exited early (status $status)"; exit 1; fi
+
       - uses: actions/upload-artifact@v7
         with:
           name: VCDPlayer-linux-${{ matrix.arch }}-appimage
