@@ -340,8 +340,11 @@ void MpvPlayer::processMpvEvents() {
     if (event->event_id == MPV_EVENT_NONE) break;
     if (event->event_id == MPV_EVENT_END_FILE) {
       auto* endFileEvent = static_cast<mpv_event_end_file*>(event->data);
-      emit logMessage(
-          QString("end-file reason=%1 error=%2").arg(endFileEvent->reason).arg(mpv_error_string(endFileEvent->error)));
+      // Every item change ends the previous file with reason STOP, so only
+      // failures are worth a line in the log.
+      if (endFileEvent->reason == MPV_END_FILE_REASON_ERROR) {
+        emit logMessage(QString("end-file error: %1").arg(mpv_error_string(endFileEvent->error)));
+      }
       emit endFile(static_cast<int>(endFileEvent->reason));
     } else if (event->event_id == MPV_EVENT_FILE_LOADED) {
       emit fileLoaded();
