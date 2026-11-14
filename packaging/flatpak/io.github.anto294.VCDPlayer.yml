@@ -70,6 +70,9 @@ modules:
   - name: libplacebo
     buildsystem: meson
     config-opts:
+      # Older flatpak-builder (Ubuntu's, in CI) doesn't pass --libdir, and
+      # meson then picks lib64 on x86_64, where nothing looks for it.
+      - --libdir=lib
       - -Dvulkan=disabled
       - -Dopengl=disabled
       - -Dd3d11=disabled
@@ -85,6 +88,7 @@ modules:
   - name: mpv
     buildsystem: meson
     config-opts:
+      - --libdir=lib
       - -Dlibmpv=true
       - -Dcplayer=false
       - -Dlua=disabled
