@@ -3,7 +3,7 @@
 Notable changes to VCD Player, release by release. Format loosely follows
 [Keep a Changelog](https://keepachangelog.com/).
 
-## [Unreleased]
+## [v1.0.0] - 2026-11-14
 
 ### Added
 
