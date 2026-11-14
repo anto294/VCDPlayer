@@ -42,6 +42,9 @@
 
 #include "../app/DiscSession.h"
 #include "../app/SleepInhibitor.h"
+#ifdef VCDPLAYER_HAVE_MPRIS
+#include "../app/Mpris.h"
+#endif
 #include "../mpv/MpvPlayer.h"
 #include "RemotePanel.h"
 #include "VideoWidget.h"
@@ -251,6 +254,7 @@ MainWindow::MainWindow(QWidget* parent) : QMainWindow(parent) {
 
   session_ = new DiscSession(player_, this);
   sleepInhibitor_ = new SleepInhibitor(this);
+  setupMpris();
 
   const QString screenshotDir = QStandardPaths::writableLocation(QStandardPaths::PicturesLocation) + "/VCDPlayer";
   QDir().mkpath(screenshotDir);
@@ -376,9 +380,12 @@ MainWindow::MainWindow(QWidget* parent) : QMainWindow(parent) {
     const QString status = pbcEnabled ? tr("PBC active · %1 chapters").arg(chapters)
                                       : tr("Sequential playback · %1 chapters").arg(chapters);
     remote_->setDiscInfo(currentDiscTitle_, status);
+    updateMpris();
   });
   connect(session_, &DiscSession::stateChanged, this, [this](int kind, int choiceCount, int firstChoice) {
     using Kind = vcd::PbcEngine::State::Kind;
+    discState_ = kind;
+    updateMpris();
     QString status;
     switch (static_cast<Kind>(kind)) {
       case Kind::End:
@@ -1193,15 +1200,65 @@ void MainWindow::onMpvPropertyChanged(const QString& name, const QVariant& value
   } else if (name == "duration") {
     lastDuration_ = value.toDouble();
     timeDurationLabel_->setText(formatTime(lastDuration_));
+    updateMpris();
+  } else if (name == "pause") {
+    updateMpris();
   } else if (name == "core-idle") {
     sleepInhibitor_->setActive(!value.toBool());
   } else if (name == "volume") {
     remote_->setVolume(value.toInt());
+    updateMpris();
   } else if (name == "mute") {
     const bool muted = value.toBool();
     remote_->setMuted(muted);
     if (muteAction_) muteAction_->setChecked(muted);
   }
+}
+
+void MainWindow::setupMpris() {
+#ifdef VCDPLAYER_HAVE_MPRIS
+  mpris_ = new Mpris(this);
+  mpris_->positionSeconds = [this]() { return player_->getProperty("time-pos").toDouble(); };
+  connect(mpris_, &Mpris::raiseRequested, this, [this]() {
+    if (isMinimized()) showNormal();
+    raise();
+    activateWindow();
+  });
+  connect(mpris_, &Mpris::quitRequested, this, &MainWindow::close);
+  connect(mpris_, &Mpris::playRequested, this, [this]() { sendRemoteButton(vcd::RemoteButton::Play); });
+  connect(mpris_, &Mpris::pauseRequested, this, [this]() { sendRemoteButton(vcd::RemoteButton::Pause); });
+  connect(mpris_, &Mpris::playPauseRequested, this, &MainWindow::togglePlayPause);
+  connect(mpris_, &Mpris::stopRequested, this, [this]() { sendRemoteButton(vcd::RemoteButton::Stop); });
+  connect(mpris_, &Mpris::nextRequested, this, [this]() { sendRemoteButton(vcd::RemoteButton::Next); });
+  connect(mpris_, &Mpris::previousRequested, this, [this]() { sendRemoteButton(vcd::RemoteButton::Prev); });
+  auto seekTo = [this](double seconds) {
+    if (lastDuration_ <= 0) return;
+    seconds = std::clamp(seconds, 0.0, lastDuration_);
+    player_->command({"seek", QString::number(seconds, 'f', 3), "absolute"});
+    emit mpris_->seeked(static_cast<qlonglong>(seconds * 1e6));
+  };
+  connect(mpris_, &Mpris::seekRequested, this,
+          [this, seekTo](double offset) { seekTo(player_->getProperty("time-pos").toDouble() + offset); });
+  connect(mpris_, &Mpris::setPositionRequested, this, seekTo);
+  connect(mpris_, &Mpris::volumeRequested, this,
+          [this](double v) { player_->setPropertyDouble("volume", std::clamp(v, 0.0, 1.0) * 100.0); });
+#endif
+}
+
+void MainWindow::updateMpris() {
+#ifdef VCDPLAYER_HAVE_MPRIS
+  if (!mpris_) return;
+  using Kind = vcd::PbcEngine::State::Kind;
+  const vcd::LoadedDisc* disc = session_->disc();
+  QString status = QStringLiteral("Stopped");
+  if (disc && discState_ != static_cast<int>(Kind::Stopped) && discState_ != static_cast<int>(Kind::End)) {
+    status = player_->getProperty("pause").toBool() ? QStringLiteral("Paused") : QStringLiteral("Playing");
+  }
+  mpris_->setPlaybackStatus(status);
+  mpris_->setMetadata(disc ? currentDiscTitle_ : QString(),
+                      disc ? QString::fromStdString(disc->info.album).trimmed() : QString(), lastDuration_);
+  mpris_->setVolume(player_->getProperty("volume").toDouble() / 100.0);
+#endif
 }
 
 void MainWindow::closeEvent(QCloseEvent* event) {
@@ -1233,6 +1290,24 @@ void MainWindow::keyPressEvent(QKeyEvent* event) {
   if (noModifier && (event->key() == Qt::Key_Up || event->key() == Qt::Key_Backspace))
     return sendRemoteButton(vcd::RemoteButton::Return);
   if (event->key() == Qt::Key_Escape && isFullScreen()) return toggleFullscreen();
+  // Keyboard media keys while the window has focus (desktops that grab
+  // them globally go through MPRIS instead, see setupMpris()).
+  switch (event->key()) {
+    case Qt::Key_MediaPlay:
+      return sendRemoteButton(vcd::RemoteButton::Play);
+    case Qt::Key_MediaPause:
+      return sendRemoteButton(vcd::RemoteButton::Pause);
+    case Qt::Key_MediaTogglePlayPause:
+      return togglePlayPause();
+    case Qt::Key_MediaStop:
+      return sendRemoteButton(vcd::RemoteButton::Stop);
+    case Qt::Key_MediaNext:
+      return sendRemoteButton(vcd::RemoteButton::Next);
+    case Qt::Key_MediaPrevious:
+      return sendRemoteButton(vcd::RemoteButton::Prev);
+    default:
+      break;
+  }
   if (noModifier && (event->key() == Qt::Key_Plus || event->key() == Qt::Key_Equal))
     return applyZoom(ZoomDirection::In);
   if (noModifier && event->key() == Qt::Key_Minus) return applyZoom(ZoomDirection::Out);

@@ -93,6 +93,7 @@ MpvPlayer::MpvPlayer(QObject* parent) : QObject(parent) {
   // false while playback actually advances (not paused, not parked at the
   // end of an item): drives the screen-sleep inhibition.
   observeProperty("core-idle", MPV_FORMAT_FLAG);
+  observeProperty("pause", MPV_FORMAT_FLAG);
 }
 
 MpvPlayer::~MpvPlayer() {

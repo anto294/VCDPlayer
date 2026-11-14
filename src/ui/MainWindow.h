@@ -20,6 +20,7 @@ class QTranslator;
 
 class DiscSession;
 class SleepInhibitor;
+class Mpris;
 class MpvPlayer;
 class RemotePanel;
 class VideoWidget;
@@ -130,10 +131,15 @@ class MainWindow : public QMainWindow {
   void updateOverlayPositions();
   void updateWindowTitle();
   void onMpvPropertyChanged(const QString& name, const QVariant& value);
+  void setupMpris();
+  // Pushes playback status / disc / volume to MPRIS (no-op without it).
+  void updateMpris();
 
   MpvPlayer* player_;
   DiscSession* session_;
   SleepInhibitor* sleepInhibitor_;
+  Mpris* mpris_ = nullptr;  // Linux/BSD only (VCDPLAYER_HAVE_MPRIS)
+  int discState_ = -1;      // last DiscSession::stateChanged kind, -1 = no disc
   VideoWidget* video_;
   RemotePanel* remote_;
   QScrollArea* remoteScroll_;  // holds remote_, so its height never sets the window's minimum

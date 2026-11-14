@@ -67,6 +67,9 @@ if(APPLE)
 elseif(UNIX)
     find_package(Qt6 REQUIRED COMPONENTS DBus)
     target_link_libraries(VCDPlayer PRIVATE Qt6::DBus)
+    # MPRIS: media keys, the desktop's media widget, playerctl, ...
+    target_sources(VCDPlayer PRIVATE src/app/Mpris.cpp)
+    target_compile_definitions(VCDPlayer PRIVATE VCDPLAYER_HAVE_MPRIS)
 endif()
 # Single source of the version number (project() above): shown in the
 # About dialog and set as QCoreApplication::applicationVersion().
