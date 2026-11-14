@@ -31,6 +31,7 @@ struct Disc {
 
 // Parses a .cue file: a single .bin holding every track, or one FILE per
 // track (or any mix). Throws std::runtime_error on malformed input.
+// cuePath and every path in the result are UTF-8 (see Utf8Path.h).
 Disc parseCue(const std::string& cuePath);
 
 // Builds the map from the disc's ISO LBAs to positions in the image

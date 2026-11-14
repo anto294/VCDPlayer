@@ -84,16 +84,19 @@ struct SyntheticVcd {
   }
 
   // Single .bin with a PREGAP'd track 2.
-  std::string saveSingle(const TempDir& dir) const {
-    image.save(dir.file("disc.bin"));
-    writeText(dir.file("disc.cue"),
+  std::string saveSingle(const TempDir& dir) const { return saveSingleIn(dir.file("")); }
+
+  // Same, into an existing folder given as a UTF-8 path.
+  std::string saveSingleIn(const std::string& folder) const {
+    image.save(folder + "/disc.bin");
+    writeText(folder + "/disc.cue",
               "FILE \"disc.bin\" BINARY\n"
               "  TRACK 01 MODE2/2352\n"
               "    INDEX 01 00:00:00\n"
               "  TRACK 02 MODE2/2352\n"
               "    PREGAP 00:02:00\n"
               "    INDEX 01 00:04:00\n");  // file sector 300 = 4 s
-    return dir.file("disc.cue");
+    return folder + "/disc.cue";
   }
 
   // Same disc as one file per track.

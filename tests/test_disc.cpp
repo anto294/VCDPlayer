@@ -39,6 +39,15 @@ void checkSyntheticDisc(const vcd::LoadedDisc& disc) {
 
 }  // namespace
 
+TEST(loads_from_a_folder_with_a_non_ascii_name) {
+  // "Città è perché": paths are UTF-8 throughout vcdcore, and must reach the
+  // file APIs as such (on Windows, narrow ones would take the ANSI code page).
+  test::TempDir dir;
+  const std::string folder = dir.file("Citt\xc3\xa0 \xc3\xa8 perch\xc3\xa9");
+  std::filesystem::create_directories(vcd::pathFromUtf8(folder));
+  checkSyntheticDisc(vcd::loadDisc(SyntheticVcd().saveSingleIn(folder)));
+}
+
 TEST(loads_single_bin_with_pregap) {
   test::TempDir dir;
   checkSyntheticDisc(vcd::loadDisc(SyntheticVcd().saveSingle(dir)));

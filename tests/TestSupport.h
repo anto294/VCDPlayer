@@ -14,6 +14,7 @@
 #include <vector>
 
 #include "DiscError.h"
+#include "Utf8Path.h"
 
 namespace test {
 
@@ -108,7 +109,7 @@ class TempDir {
 };
 
 inline void writeText(const std::string& path, const std::string& text) {
-  std::ofstream(path, std::ios::binary) << text;
+  std::ofstream(vcd::pathFromUtf8(path), std::ios::binary) << text;
 }
 
 inline void putLe32(uint8_t* p, uint32_t v) {
@@ -149,7 +150,7 @@ class Image {
 
   void save(const std::string& path, int fromLba = 0, int count = -1) const {
     if (count < 0) count = sectors() - fromLba;
-    std::ofstream(path, std::ios::binary)
+    std::ofstream(vcd::pathFromUtf8(path), std::ios::binary)
         .write(reinterpret_cast<const char*>(data_.data()) + static_cast<size_t>(fromLba) * 2352,
                static_cast<std::streamsize>(count) * 2352);
   }

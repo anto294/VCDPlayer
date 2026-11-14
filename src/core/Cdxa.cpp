@@ -6,6 +6,7 @@
 #include <utility>
 
 #include "DiscError.h"
+#include "Utf8Path.h"
 
 namespace vcd {
 
@@ -33,7 +34,11 @@ int64_t ftell64(FILE* fp) {
 CdxaReader CdxaReader::open(const DiscImage& image) {
   CdxaReader reader;
   for (const std::string& path : image.files) {
-    FILE* fp = std::fopen(path.c_str(), "rb");
+#ifdef _WIN32
+    FILE* fp = _wfopen(pathFromUtf8(path).c_str(), L"rb");
+#else
+    FILE* fp = std::fopen(pathFromUtf8(path).c_str(), "rb");
+#endif
     if (!fp)
       throw DiscError(DiscError::Code::BinUnreadable,
                       "Unable to open .bin file: " + path);  // reader's dtor closes the others

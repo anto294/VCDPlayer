@@ -26,6 +26,7 @@ struct LoadedDisc {
 // (MPEGAV/AVSEQnn.DAT) and segment item (SEGMENT/ITEMnnnn.DAT), plus the
 // image layout mapping those onto the .bin (see imageLayout()). Throws
 // std::runtime_error on invalid input/not a VCD.
+// cuePath is UTF-8 (see Utf8Path.h).
 LoadedDisc loadDisc(const std::string& cuePath);
 
 }  // namespace vcd

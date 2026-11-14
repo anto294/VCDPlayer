@@ -9,6 +9,7 @@
 #include <stdexcept>
 
 #include "DiscError.h"
+#include "Utf8Path.h"
 
 namespace vcd {
 
@@ -46,19 +47,19 @@ std::string lowerAscii(std::string s) {
 // ("C:\rips\disc.bin") — fall back to the bare file name, matched
 // case-insensitively, next to the .cue itself.
 std::string resolveBinPath(const fs::path& cueDir, const std::string& fileName) {
-  const fs::path direct = cueDir / fileName;
+  const fs::path direct = cueDir / pathFromUtf8(fileName);
   std::error_code ec;
-  if (fs::exists(direct, ec)) return direct.string();
+  if (fs::exists(direct, ec)) return pathToUtf8(direct);
 
   const auto sep = fileName.find_last_of("/\\");
   const std::string bareName = sep == std::string::npos ? fileName : fileName.substr(sep + 1);
   const std::string wanted = lowerAscii(bareName);
   for (const auto& entry : fs::directory_iterator(cueDir.empty() ? fs::path(".") : cueDir, ec)) {
-    if (entry.is_regular_file(ec) && lowerAscii(entry.path().filename().string()) == wanted) {
-      return entry.path().string();
+    if (entry.is_regular_file(ec) && lowerAscii(pathToUtf8(entry.path().filename())) == wanted) {
+      return pathToUtf8(entry.path());
     }
   }
-  return direct.string();  // not found: let the open fail with the name as written
+  return pathToUtf8(direct);  // not found: let the open fail with the name as written
 }
 
 std::string trim(const std::string& s) {
@@ -71,7 +72,7 @@ std::string trim(const std::string& s) {
 }  // namespace
 
 Disc parseCue(const std::string& cuePath) {
-  std::ifstream in(cuePath, std::ios::binary);
+  std::ifstream in(pathFromUtf8(cuePath), std::ios::binary);
   if (!in) throw DiscError(DiscError::Code::CueUnreadable, "Unable to open .cue file: " + cuePath);
   std::stringstream buf;
   buf << in.rdbuf();
@@ -98,7 +99,7 @@ Disc parseCue(const std::string& cuePath) {
 
     std::smatch m;
     if (std::regex_search(line, m, kFileRe)) {
-      disc.files.push_back(resolveBinPath(fs::path(cuePath).parent_path(), m[1].str()));
+      disc.files.push_back(resolveBinPath(pathFromUtf8(cuePath).parent_path(), m[1].str()));
       continue;
     }
     if (std::regex_search(line, m, kTrackRe)) {
