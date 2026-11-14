@@ -20,7 +20,14 @@ alongside a plain sequential-playback fallback for discs without PBC.
 ## Features
 
 - Native `.cue`/`.bin` VCD image loading (no mounting/extraction required)
-- Full PBC (PlayBack Control) menu navigation
+- Full PBC (PlayBack Control) menu navigation, or plain track-by-track
+  playback for discs without it
+- **Go to chapter** list (from the disc's `ENTRIES.VCD`, with real start
+  times read from the MPEG stream) and **Disc information**
+- Resume where you left off, and a **Recent discs** menu
+- Karaoke channel selection: stereo, left only or right only
+- Keeps the screen on while a video plays; media keys, plus MPRIS on Linux
+  (the desktop's media widget, lock screen, KDE Connect, `playerctl`)
 - Collapsible remote-control panel: d-pad, numeric keypad, transport
   controls, volume/mute, fullscreen
 - Zoom, screenshot, always-on-top, and progress bar/time label toggles
@@ -31,7 +38,8 @@ alongside a plain sequential-playback fallback for discs without PBC.
 - Experimental GPU upscaling presets (Anime4K for cartoons, FSRCNNX for live
   action, RAVU, AMD FSR, AMD CAS sharpening) and CPU upscaling for VCD's low
   native resolution (352x288), under the **Experimental** menu
-- Open via drag & drop, "Open with", or command line (`VCDPlayer.exe path\to\disc.cue`)
+- `.cue` file association (Linux packages and the Windows installer), plus
+  drag & drop, "Open with", or command line (`VCDPlayer path/to/disc.cue`)
 - Italian and English UI (Qt Linguist `.ts`/`.qm`)
 
 ## Building
@@ -103,9 +111,22 @@ cmake --build build
 
 ## Prebuilt builds
 
-Every push builds portable Windows (x64, arm64) archives and Linux (x86_64,
-arm64) AppImages — see the **Actions** tab for build artifacts from any run,
-or **Releases** for tagged versions.
+Download them from [Releases](https://github.com/anto294/VCDPlayer/releases)
+(every push also builds them: see the **Actions** tab). All come for x64 /
+x86_64 and arm64:
+
+| Package | Platform | Notes |
+|---|---|---|
+| `VCDPlayer-windows-*-setup.exe` | Windows 10/11 | Installer: Start menu entry, `.cue` association, uninstaller. Per-user (no admin) or for all users. |
+| `VCDPlayer-windows-*-portable.zip` | Windows 10/11 | Unzip anywhere and run `VCDPlayer.exe`. |
+| `VCDPlayer-linux-*.flatpak` | Any Linux with Flatpak | `flatpak install --user VCDPlayer-linux-x86_64.flatpak` (pulls the KDE runtime from Flathub). |
+| `VCDPlayer-linux-*.deb` | Ubuntu 24.04+, Debian 13+ | `sudo apt install ./VCDPlayer-linux-x86_64.deb` |
+| `VCDPlayer-linux-*.AppImage` | Any recent Linux | `chmod +x` and run; no install. |
+
+The Linux packages (except the AppImage, unless integrated by a tool such as
+Gear Lever) register VCD Player for `.cue` files. The Flatpak can read your
+home folder and removable media (a `.cue`'s `.bin` sits next to it) and
+writes only screenshots, to `Pictures/VCDPlayer`.
 
 ## Test samples
 
