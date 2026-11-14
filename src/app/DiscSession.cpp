@@ -58,6 +58,7 @@ bool DiscSession::openDiscPath(const QString& cuePath, QString* errorMessage) {
   cancelAllTimeouts();
   pbc_.reset();
   disc_ = std::move(loaded);
+  cuePath_ = cuePath;
 
   pbc_ = std::make_unique<vcd::PbcEngine>(disc_->info, disc_->entriesFile, disc_->lot, disc_->psd, disc_->trackStreams,
                                           disc_->segmentStreams, this, this);
@@ -81,9 +82,25 @@ void DiscSession::sendRemoteButton(vcd::RemoteButton btn, int number) {
   if (pbc_) pbc_->onRemoteButton(btn, number);
 }
 
-void DiscSession::loadAndPlay(int64_t lba, int64_t sectorCount) {
+void DiscSession::jumpToChapter(int index) {
+  if (pbc_) pbc_->jumpToEntry(index);
+}
+
+std::optional<vcd::PbcEngine::ResumePoint> DiscSession::resumePoint() const {
+  return pbc_ ? pbc_->resumePoint() : std::nullopt;
+}
+
+bool DiscSession::resume(const vcd::PbcEngine::ResumePoint& point, double startSeconds) {
+  return pbc_ && pbc_->resume(point, startSeconds);
+}
+
+void DiscSession::loadAndPlay(int64_t lba, int64_t sectorCount, double startSeconds) {
   if (!disc_) return;
   const std::string uri = registry_.registerStream(disc_->image, lba, sectorCount);
+  // mpv reads "start" when the file loads, so it must be (re)set for every
+  // load: a resume position must not stick to the items after it.
+  player_->setPropertyString("start",
+                             startSeconds > 0 ? QString::number(startSeconds, 'f', 3) : QStringLiteral("none"));
   player_->command({"loadfile", QString::fromStdString(uri)});
 }
 

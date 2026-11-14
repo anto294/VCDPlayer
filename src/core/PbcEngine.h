@@ -23,7 +23,8 @@ struct StreamRef {
 class IPlaybackSink {
  public:
   virtual ~IPlaybackSink() = default;
-  virtual void loadAndPlay(int64_t lba, int64_t sectorCount) = 0;
+  // startSeconds > 0 starts that far into the stream (resuming).
+  virtual void loadAndPlay(int64_t lba, int64_t sectorCount, double startSeconds) = 0;
   virtual void play() = 0;
   virtual void pause() = 0;
   virtual void stop() = 0;  // stop and unload the current item
@@ -82,6 +83,28 @@ class PbcEngine {
 
   State state() const;
 
+  // Leaves PBC navigation and plays from ENTRIES.VCD entry `entryIndex`
+  // (a chapter), then on through the following tracks, like a hardware
+  // player's direct track access. Ignored if the entry doesn't resolve.
+  void jumpToEntry(int entryIndex);
+
+  // What is playing, enough to put playback back there later: the stream
+  // itself plus the PBC node (or plain track) around it, so navigation
+  // carries on normally once it finishes. The time within the stream is
+  // the caller's (mpv's) business.
+  struct ResumePoint {
+    int64_t streamLba = 0;
+    int64_t streamSectors = 0;
+    int plainTrack = 0;      // > 0: sequential playback of this track (no PBC node)
+    int64_t psdOffset = -1;  // >= 0: the PBC node being played
+    int playlistIndex = -1;  // its item, when that node is a play list
+  };
+  // nullopt unless an item is playing (not in a menu, stopped or ended).
+  std::optional<ResumePoint> resumePoint() const;
+  // Restores `p` and plays its stream from startSeconds. Returns false,
+  // changing nothing, if `p` doesn't fit this disc (stale or bogus data).
+  bool resume(const ResumePoint& p, double startSeconds);
+
   // Notified (synchronously, on the same thread that calls
   // start()/onRemoteButton()/onEof()) on every state change.
   std::function<void(const State&)> onStateChanged;
@@ -103,6 +126,8 @@ class PbcEngine {
   // disc instead if such jumps keep chaining (a cycle in a corrupt PSD).
   void jumpImmediately(int64_t byteOffset);
   void notify();
+  void load(const StreamRef& stream, double startSeconds = 0);
+  bool isKnownStream(int64_t lba, int64_t sectors) const;
 
   VcdInfo info_;
   EntriesFile entriesFile_;
@@ -114,6 +139,8 @@ class PbcEngine {
   ITimerHost* timerHost_;
 
   std::optional<PsdDescriptor> currentDescriptor_;
+  int64_t currentOffset_ = -1;       // PSD byte offset of currentDescriptor_
+  std::optional<StreamRef> loaded_;  // stream last handed to the sink
   std::optional<int> plainTrack_;
   int selectionPlaysLeft_ = 1;  // -1 = loop forever
   int playlistIndex_ = -1;      // item of the current playlist being played

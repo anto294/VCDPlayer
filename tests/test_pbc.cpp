@@ -86,7 +86,14 @@ struct FakeHost : vcd::IPlaybackSink, vcd::ITimerHost {
   };
   std::map<TimerId, Pending> timers;
 
-  void loadAndPlay(int64_t lba, int64_t) override { loadedTracks.push_back(static_cast<int>(lba / 1000)); }
+  int64_t lastLba = -1, lastSectors = 0;
+  double lastStart = 0;
+  void loadAndPlay(int64_t lba, int64_t sectors, double startSeconds) override {
+    loadedTracks.push_back(static_cast<int>(lba / 1000));
+    lastLba = lba;
+    lastSectors = sectors;
+    lastStart = startSeconds;
+  }
   void play() override {}
   void pause() override {}
   void stop() override { stops++; }
@@ -111,11 +118,24 @@ std::map<int, vcd::StreamRef> tracks() {
   return t;
 }
 
+// Chapters: track 2 at its start and 4 sectors in, track 3 at its start.
+vcd::EntriesFile entries() {
+  vcd::EntriesFile e;
+  e.entries = {{.track = 2, .isoLba = 2000}, {.track = 2, .isoLba = 2004}, {.track = 3, .isoLba = 3000}};
+  return e;
+}
+
 struct Engine {
   FakeHost host;
   PbcEngine engine;
   explicit Engine(const PsdBuilder& b, std::vector<uint8_t> lot = PsdBuilder::lot())
-      : engine(vcd::VcdInfo{}, vcd::EntriesFile{}, std::move(lot), b.psd, tracks(), {}, &host, &host) {}
+      : engine(vcd::VcdInfo{}, entries(), std::move(lot), b.psd, tracks(), {}, &host, &host) {}
+};
+
+// A disc without PBC (no LOT/PSD): plays its tracks in order.
+struct PlainEngine {
+  FakeHost host;
+  PbcEngine engine{vcd::VcdInfo{}, entries(), {}, {}, tracks(), {}, &host, &host};
 };
 
 using Kind = PbcEngine::State::Kind;
@@ -277,4 +297,90 @@ TEST(short_zero_wait_chain_is_followed) {
   e.engine.start();
   CHECK_EQ(e.host.lastTrack(), 5);
   CHECK(e.engine.state().kind == Kind::Menu);
+}
+
+TEST(plain_disc_next_prev_step_through_tracks) {
+  PlainEngine e;
+  e.engine.start();
+  CHECK_EQ(e.host.lastTrack(), 2);
+  e.engine.onRemoteButton(RemoteButton::Next);
+  CHECK_EQ(e.host.lastTrack(), 3);
+  e.engine.onRemoteButton(RemoteButton::Prev);
+  CHECK_EQ(e.host.lastTrack(), 2);
+  e.engine.onRemoteButton(RemoteButton::Prev);  // first track: restart it
+  CHECK_EQ(e.host.lastTrack(), 2);
+  CHECK_EQ(e.host.loadedTracks.size(), size_t{4});
+  e.engine.onRemoteButton(RemoteButton::Return);  // no PBC: nothing to return to
+  CHECK_EQ(e.host.loadedTracks.size(), size_t{4});
+}
+
+TEST(jump_to_entry_leaves_pbc_and_return_goes_back_to_menu) {
+  PsdBuilder b;
+  b.selection(0, {.item = 2, .choices = {PsdBuilder::slot(0)}});
+  Engine e(b);
+  e.engine.start();
+  CHECK(e.engine.state().kind == Kind::Menu);
+  e.engine.jumpToEntry(1);
+  CHECK_EQ(e.host.lastLba, 2004);
+  CHECK_EQ(e.host.lastSectors, 6);
+  CHECK(e.engine.state().kind == Kind::Playing);
+  e.engine.onEof();  // carries on with the next track
+  CHECK_EQ(e.host.lastTrack(), 3);
+  e.engine.onRemoteButton(RemoteButton::Return);
+  CHECK(e.engine.state().kind == Kind::Menu);
+  e.engine.jumpToEntry(99);  // out of range: ignored
+  CHECK(e.engine.state().kind == Kind::Menu);
+}
+
+TEST(resume_point_round_trip_in_a_playlist) {
+  PsdBuilder b;
+  b.playlist(0, {.items = {2, 3, 4}, .next = PsdBuilder::slot(1)});
+  b.selection(1, {.item = 5, .choices = {PsdBuilder::slot(0)}});
+  Engine e(b);
+  e.engine.start();
+  e.engine.onEof();
+  CHECK_EQ(e.host.lastTrack(), 3);
+  const auto point = e.engine.resumePoint();
+  CHECK(point.has_value());
+  CHECK_EQ(point->psdOffset, 0);
+  CHECK_EQ(point->playlistIndex, 1);
+
+  // A fresh engine (disc reopened) picks up from there...
+  Engine again(b);
+  CHECK(again.engine.resume(*point, 42.5));
+  CHECK_EQ(again.host.lastTrack(), 3);
+  CHECK_EQ(again.host.lastStart, 42.5);
+  CHECK(again.engine.state().kind == Kind::Playing);
+  // ...and the play list carries on normally after it.
+  again.engine.onEof();
+  CHECK_EQ(again.host.lastTrack(), 4);
+  again.engine.onEof();
+  CHECK_EQ(again.host.lastTrack(), 5);
+  CHECK(again.engine.state().kind == Kind::Menu);
+
+  // No resume point in a menu.
+  CHECK(!again.engine.resumePoint().has_value());
+}
+
+TEST(resume_plain_track_and_reject_bogus_points) {
+  PlainEngine e;
+  e.engine.start();
+  e.engine.onEof();
+  const auto point = e.engine.resumePoint();
+  CHECK(point.has_value());
+  CHECK_EQ(point->plainTrack, 3);
+
+  PlainEngine again;
+  CHECK(again.engine.resume(*point, 10));
+  again.engine.onEof();
+  CHECK_EQ(again.host.lastTrack(), 4);
+
+  PlainEngine fresh;
+  vcd::PbcEngine::ResumePoint bogus = *point;
+  bogus.streamLba = 999999;  // not on this disc
+  CHECK(!fresh.engine.resume(bogus, 10));
+  bogus = *point;
+  bogus.plainTrack = 0;  // claims a PBC node, but the disc has no PBC
+  CHECK(!fresh.engine.resume(bogus, 10));
+  CHECK(fresh.host.loadedTracks.empty());
 }

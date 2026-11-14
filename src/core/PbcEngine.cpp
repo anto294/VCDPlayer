@@ -39,8 +39,7 @@ void PbcEngine::playPlainTrack(int trackNumber) {
     return;
   }
   plainTrack_ = trackNumber;
-  sink_->loadAndPlay(it->second.lba, it->second.sectorCount);
-  sink_->play();
+  load(it->second);
   notify();
 }
 
@@ -52,6 +51,7 @@ void PbcEngine::goTo(std::optional<int64_t> byteOffset) {
     end();
     return;
   }
+  plainTrack_.reset();
   PsdDescriptor d;
   try {
     d = readPsdDescriptor(psd_, *byteOffset);
@@ -64,6 +64,7 @@ void PbcEngine::goTo(std::optional<int64_t> byteOffset) {
     return;
   }
   currentDescriptor_ = d;
+  currentOffset_ = *byteOffset;
 
   if (d.type == PsdType::End) {
     end();
@@ -149,18 +150,14 @@ bool PbcEngine::playItemRef(const ItemRef& itemRef) {
   if (itemRef.kind == ItemRef::Kind::Track) {
     const auto it = trackStreams_.find(itemRef.track);
     if (it == trackStreams_.end()) return false;
-    immediateJumps_ = 0;
-    sink_->loadAndPlay(it->second.lba, it->second.sectorCount);
-    sink_->play();
+    load(it->second);
     return true;
   }
 
   if (itemRef.kind == ItemRef::Kind::Segment) {
     const auto it = segmentStreams_.find(itemRef.segmentNumber);
     if (it == segmentStreams_.end()) return false;
-    immediateJumps_ = 0;
-    sink_->loadAndPlay(it->second.lba, it->second.sectorCount);
-    sink_->play();
+    load(it->second);
     return true;
   }
 
@@ -170,9 +167,7 @@ bool PbcEngine::playItemRef(const ItemRef& itemRef) {
     const auto it = trackStreams_.find(entry.track);
     if (it == trackStreams_.end()) return false;
     const int64_t startSector = std::max<int64_t>(0, entry.isoLba - it->second.lba);
-    immediateJumps_ = 0;
-    sink_->loadAndPlay(it->second.lba + startSector, it->second.sectorCount - startSector);
-    sink_->play();
+    load(StreamRef{it->second.lba + startSector, it->second.sectorCount - startSector});
     return true;
   }
 
@@ -231,6 +226,22 @@ void PbcEngine::onRemoteButton(RemoteButton btn, int number) {
     }
     return;
   }
+  if (plainTrack_ && (btn == RemoteButton::Next || btn == RemoteButton::Prev || btn == RemoteButton::Return)) {
+    // Sequential playback (no PBC, or after jumpToEntry()): Next/Prev step
+    // through the tracks, Return goes (back) to the disc's PBC menu.
+    if (btn == RemoteButton::Return) {
+      if (pbcAvailable()) start();
+      return;
+    }
+    // Prev on the first track restarts it; Next on the last does nothing.
+    const int target = *plainTrack_ + (btn == RemoteButton::Next ? 1 : -1);
+    if (trackStreams_.count(target)) {
+      playPlainTrack(target);
+    } else if (btn == RemoteButton::Prev) {
+      playPlainTrack(*plainTrack_);
+    }
+    return;
+  }
   if (btn == RemoteButton::Next && d && d->nextOfs.kind == PsdOfs::Kind::Offset) {
     goTo(d->nextOfs.byteOffset);
     return;
@@ -257,6 +268,7 @@ void PbcEngine::onRemoteButton(RemoteButton btn, int number) {
     pendingNumber_ = -1;
     currentDescriptor_.reset();
     plainTrack_.reset();
+    loaded_.reset();
     stopped_ = true;
     sink_->stop();
     notify();
@@ -282,7 +294,100 @@ void PbcEngine::commitTypedNumber() {
 void PbcEngine::end() {
   ended_ = true;
   currentDescriptor_.reset();
+  loaded_.reset();
   notify();
+}
+
+void PbcEngine::load(const StreamRef& stream, double startSeconds) {
+  immediateJumps_ = 0;  // something plays: any chain of empty nodes is over
+  loaded_ = stream;
+  sink_->loadAndPlay(stream.lba, stream.sectorCount, startSeconds);
+  sink_->play();
+}
+
+bool PbcEngine::isKnownStream(int64_t lba, int64_t sectors) const {
+  if (sectors <= 0) return false;
+  for (const auto* streams : {&trackStreams_, &segmentStreams_}) {
+    for (const auto& [number, s] : *streams) {
+      if (lba >= s.lba && lba + sectors <= s.lba + s.sectorCount) return true;
+    }
+  }
+  return false;
+}
+
+void PbcEngine::jumpToEntry(int entryIndex) {
+  if (entryIndex < 0 || static_cast<size_t>(entryIndex) >= entriesFile_.entries.size()) return;
+  const EntriesEntry& entry = entriesFile_.entries[entryIndex];
+  const auto it = trackStreams_.find(entry.track);
+  if (it == trackStreams_.end()) return;
+  timerHost_->cancelTimeout(TimerId::Navigation);
+  timerHost_->cancelTimeout(TimerId::DigitEntry);
+  pendingNumber_ = -1;
+  ended_ = false;
+  stopped_ = false;
+  currentDescriptor_.reset();
+  currentOffset_ = -1;
+  plainTrack_ = entry.track;
+  const int64_t startSector = std::clamp<int64_t>(entry.isoLba - it->second.lba, 0, it->second.sectorCount - 1);
+  load(StreamRef{it->second.lba + startSector, it->second.sectorCount - startSector});
+  notify();
+}
+
+std::optional<PbcEngine::ResumePoint> PbcEngine::resumePoint() const {
+  if (!loaded_ || state().kind != State::Kind::Playing) return std::nullopt;
+  ResumePoint p;
+  p.streamLba = loaded_->lba;
+  p.streamSectors = loaded_->sectorCount;
+  if (plainTrack_) {
+    p.plainTrack = *plainTrack_;
+  } else if (currentDescriptor_) {
+    p.psdOffset = currentOffset_;
+    if (currentDescriptor_->type == PsdType::Playlist) p.playlistIndex = playlistIndex_;
+  } else {
+    return std::nullopt;
+  }
+  return p;
+}
+
+bool PbcEngine::resume(const ResumePoint& p, double startSeconds) {
+  if (!isKnownStream(p.streamLba, p.streamSectors)) return false;
+  std::optional<PsdDescriptor> d;
+  if (p.plainTrack > 0) {
+    if (!trackStreams_.count(p.plainTrack)) return false;
+  } else {
+    if (!pbcAvailable() || p.psdOffset < 0) return false;
+    try {
+      d = readPsdDescriptor(psd_, p.psdOffset);
+    } catch (const std::exception&) {
+      return false;
+    }
+    if (d->type == PsdType::Playlist) {
+      if (p.playlistIndex < 0 || p.playlistIndex >= static_cast<int>(d->items.size())) return false;
+    } else if (d->type != PsdType::Selection) {
+      return false;
+    }
+  }
+
+  timerHost_->cancelTimeout(TimerId::Navigation);
+  timerHost_->cancelTimeout(TimerId::DigitEntry);
+  pendingNumber_ = -1;
+  ended_ = false;
+  stopped_ = false;
+  if (p.plainTrack > 0) {
+    currentDescriptor_.reset();
+    currentOffset_ = -1;
+    plainTrack_ = p.plainTrack;
+  } else {
+    plainTrack_.reset();
+    currentDescriptor_ = d;
+    currentOffset_ = p.psdOffset;
+    playlistIndex_ = p.playlistIndex;
+    // Resuming plays the item once more at most; its loop count restarts.
+    selectionPlaysLeft_ = 1;
+  }
+  load(StreamRef{p.streamLba, p.streamSectors}, startSeconds);
+  notify();
+  return true;
 }
 
 void PbcEngine::notify() {
@@ -292,6 +397,7 @@ void PbcEngine::notify() {
 PbcEngine::State PbcEngine::state() const {
   if (stopped_) return State{State::Kind::Stopped, 0};
   if (ended_) return State{State::Kind::End, 0};
+  if (plainTrack_) return State{State::Kind::Playing, 0};
   if (!currentDescriptor_) return State{State::Kind::Loading, 0};
   if (currentDescriptor_->type == PsdType::Selection && !currentDescriptor_->choices.empty()) {
     return State{State::Kind::Menu, static_cast<int>(currentDescriptor_->choices.size()), currentDescriptor_->bsn};

@@ -36,6 +36,17 @@ class DiscSession : public QObject, public vcd::IPlaybackSink, public vcd::ITime
   // Stopped or at the end of the disc: Play restarts it rather than resuming.
   bool isIdle() const;
 
+  // The open disc's parsed structure (nullptr if none): for the chapter
+  // list and the Disc information dialog.
+  const vcd::LoadedDisc* disc() const { return disc_ ? &*disc_ : nullptr; }
+  QString cuePath() const { return cuePath_; }
+  // Plays from ENTRIES.VCD entry `index` (see PbcEngine::jumpToEntry()).
+  void jumpToChapter(int index);
+  // Resume support (see PbcEngine::ResumePoint): the point is saved along
+  // with mpv's time-pos, and handed back to resume() on a later open.
+  std::optional<vcd::PbcEngine::ResumePoint> resumePoint() const;
+  bool resume(const vcd::PbcEngine::ResumePoint& point, double startSeconds);
+
  signals:
   void discLoaded(QString volumeId, bool pbcEnabled, int chapters);
   // kind: vcd::PbcEngine::State::Kind converted to int (Loading=0, Playing=1, Menu=2, End=3, Stopped=4).
@@ -45,7 +56,7 @@ class DiscSession : public QObject, public vcd::IPlaybackSink, public vcd::ITime
 
  private:
   // vcd::IPlaybackSink
-  void loadAndPlay(int64_t lba, int64_t sectorCount) override;
+  void loadAndPlay(int64_t lba, int64_t sectorCount, double startSeconds) override;
   void play() override;
   void pause() override;
   void stop() override;
@@ -64,6 +75,7 @@ class DiscSession : public QObject, public vcd::IPlaybackSink, public vcd::ITime
   vcd::VcdStreamRegistry registry_;
   std::unique_ptr<vcd::PbcEngine> pbc_;
   std::optional<vcd::LoadedDisc> disc_;
+  QString cuePath_;
   struct PendingTimer {
     QTimer* timer = nullptr;
     std::function<void()> cb;
