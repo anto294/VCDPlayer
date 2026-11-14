@@ -25,6 +25,7 @@
 #include <QPushButton>
 #include <QResizeEvent>
 #include <QScreen>
+#include <QScrollArea>
 #include <QSettings>
 #include <QSignalBlocker>
 #include <QSlider>
@@ -46,7 +47,7 @@ namespace {
 constexpr int kSeekBarMax = 1000;
 constexpr int kWindowMargin = 24;
 constexpr int kLayoutSpacing = 10;
-constexpr int kPanelWidth = 224;      // must match RemotePanel::setFixedWidth()
+constexpr int kPanelWidth = 224;      // remote panel column (its scroll area's fixed width)
 constexpr int kToggleRailWidth = 36;  // permanent slot for panelToggleButton_, see updateOverlayPositions()
 
 // mpv's software renderer defaults to zimg for the actual scale step
@@ -142,11 +143,12 @@ MainWindow::MainWindow(QWidget* parent) : QMainWindow(parent) {
   }
 
   updateWindowTitle();
-  // Preferred size, shrunk to fit small screens: a fixed 1155x700 minimum
+  // Preferred size (tall enough for the whole remote panel without
+  // scrolling), shrunk to fit small screens: a fixed 1155x700 minimum
   // didn't fit e.g. a 1366x768 laptop at 125% scaling (~1093x614 logical
-  // pixels). The real minimum now comes from the layout itself (remote
-  // panel + the video box's own minimum).
-  QSize initialSize(1155, 700);
+  // pixels). The real minimum now comes from the layout itself (the video
+  // box's own minimum; the remote panel scrolls when it doesn't fit).
+  QSize initialSize(1155, 760);
   if (const QScreen* screen = QGuiApplication::primaryScreen()) {
     initialSize = initialSize.boundedTo(screen->availableGeometry().size() * 0.9);
   }
@@ -258,8 +260,18 @@ MainWindow::MainWindow(QWidget* parent) : QMainWindow(parent) {
   rootLayout->addWidget(toggleRailSpacer_, 0);
 
   remote_ = new RemotePanel(central);
-  remote_->setFixedWidth(kPanelWidth);
-  rootLayout->addWidget(remote_, 0);
+  // The panel's full height (~650 px) used to be the window's minimum
+  // height, too tall for small or scaled screens. Inside a scroll area it
+  // fills the column normally and only scrolls when the window is shorter
+  // than it. The column width stays fixed; the panel itself takes whatever
+  // the viewport leaves next to a scroll bar.
+  remoteScroll_ = new QScrollArea(central);
+  remoteScroll_->setWidget(remote_);
+  remoteScroll_->setWidgetResizable(true);
+  remoteScroll_->setFrameShape(QFrame::NoFrame);
+  remoteScroll_->setHorizontalScrollBarPolicy(Qt::ScrollBarAlwaysOff);
+  remoteScroll_->setFixedWidth(kPanelWidth);
+  rootLayout->addWidget(remoteScroll_, 0);
 
   panelToggleButton_ = new QPushButton(central);
   panelToggleButton_->setFixedSize(28, 51);
@@ -809,7 +821,7 @@ void MainWindow::applyViewSettingsToUi() {
 }
 
 void MainWindow::setRemoteVisible(bool visible) {
-  remote_->setVisible(visible);
+  remoteScroll_->setVisible(visible);
   toggleRailSpacer_->setVisible(visible);
 }
 

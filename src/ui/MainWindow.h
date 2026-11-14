@@ -13,6 +13,7 @@ class QLabel;
 class QMenu;
 class QPushButton;
 class QResizeEvent;
+class QScrollArea;
 class QSlider;
 class QTranslator;
 
@@ -110,6 +111,7 @@ class MainWindow : public QMainWindow {
   DiscSession* session_;
   VideoWidget* video_;
   RemotePanel* remote_;
+  QScrollArea* remoteScroll_;  // holds remote_, so its height never sets the window's minimum
   QWidget* toggleRailSpacer_;  // slot for panelToggleButton_ between video and panel; hidden when panel is collapsed so
                                // the video reclaims that width
   QWidget* progressRow_;

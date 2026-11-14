@@ -19,7 +19,6 @@ QPushButton* makeButton(const QString& text, const QString& tooltip = QString())
 }  // namespace
 
 RemotePanel::RemotePanel(QWidget* parent) : QWidget(parent) {
-  setFixedWidth(224);
   // A plain QWidget doesn't paint its stylesheet's background/border on its
   // own; without this it stays see-through, which used to be invisible when
   // the panel sat beside the video but now that it floats on top of it (see
