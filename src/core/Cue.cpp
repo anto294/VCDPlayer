@@ -45,7 +45,11 @@ Disc parseCue(const std::string& cuePath) {
   if (!in) throw std::runtime_error("Unable to open .cue file: " + cuePath);
   std::stringstream buf;
   buf << in.rdbuf();
-  const std::string text = buf.str();
+  std::string text = buf.str();
+  // Windows tools (Notepad, some rippers) save .cue files with a UTF-8 byte
+  // order mark; left in, it sits in front of the first "FILE" keyword and
+  // the whole sheet parses as if it had no FILE directive at all.
+  if (text.rfind("\xEF\xBB\xBF", 0) == 0) text.erase(0, 3);
 
   static const std::regex kFileRe(R"re(^FILE\s+"([^"]+)"\s+(\S+))re", std::regex::icase);
   static const std::regex kTrackRe(R"re(^TRACK\s+(\d+)\s+(\S+))re", std::regex::icase);
