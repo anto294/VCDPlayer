@@ -67,48 +67,72 @@ void PbcEngine::goTo(std::optional<int64_t> byteOffset) {
     return;
   }
 
-  const ItemRef item = d.type == PsdType::Playlist ? (d.items.empty() ? ItemRef{} : d.items[0].ref) : d.item.ref;
-  playItemRef(item);
-
-  if (d.type == PsdType::Selection && !d.choices.empty()) {
-    const std::optional<int64_t> timeoutMs = totimeToMs(d.totime);
-    if (timeoutMs && d.timeoutOfs.kind == PsdOfs::Kind::Offset) {
-      const int64_t offset = d.timeoutOfs.byteOffset;
-      timerHost_->scheduleTimeout(*timeoutMs, [this, offset]() { goTo(offset); });
-    }
+  if (d.type == PsdType::Playlist) {
+    playItemRef(d.items.empty() ? ItemRef{} : d.items[0].ref);
+    notify();
+    return;
   }
 
+  // Selection: its item plays `loop` times (low 7 bits; 0x7f = forever),
+  // and only once it's done does the totime wait (and then the jump to
+  // the timeout list) start.
+  const int loopCount = d.loop & 0x7f;
+  selectionPlaysLeft_ = loopCount == 0x7f ? -1 : std::max(1, loopCount);
   notify();
+  if (!playItemRef(d.item.ref)) startSelectionWait();  // nothing to play: wait right away
 }
 
-void PbcEngine::playItemRef(const ItemRef& itemRef) {
-  if (itemRef.kind == ItemRef::Kind::None || itemRef.kind == ItemRef::Kind::Unknown) return;
+void PbcEngine::startSelectionWait() {
+  if (!currentDescriptor_ || currentDescriptor_->type != PsdType::Selection) return;
+  const PsdDescriptor& d = *currentDescriptor_;
+  const std::optional<int64_t> waitMs = totimeToMs(d.totime);
+  if (!waitMs) return;  // totime 255: wait for a choice indefinitely
 
+  // Where the node goes when nobody picks anything. Discs routinely use
+  // nos=0 selection nodes with totime=0 as "play this, then go there", and
+  // point only timeoutOfs (not nextOfs) at the follow-up list.
+  PsdOfs target = d.timeoutOfs;
+  if (target.kind != PsdOfs::Kind::Offset) target = d.defaultOfs;
+  if (target.kind != PsdOfs::Kind::Offset && d.choices.empty()) target = d.nextOfs;
+  if (target.kind != PsdOfs::Kind::Offset) return;
+
+  const int64_t offset = target.byteOffset;
+  if (*waitMs == 0) {
+    goTo(offset);
+  } else {
+    timerHost_->scheduleTimeout(*waitMs, [this, offset]() { goTo(offset); });
+  }
+}
+
+bool PbcEngine::playItemRef(const ItemRef& itemRef) {
   if (itemRef.kind == ItemRef::Kind::Track) {
     const auto it = trackStreams_.find(itemRef.track);
-    if (it == trackStreams_.end()) return;
+    if (it == trackStreams_.end()) return false;
     sink_->loadAndPlay(it->second.lba, it->second.sectorCount);
     sink_->play();
-    return;
+    return true;
   }
 
   if (itemRef.kind == ItemRef::Kind::Segment) {
     const auto it = segmentStreams_.find(itemRef.segmentNumber);
-    if (it == segmentStreams_.end()) return;
+    if (it == segmentStreams_.end()) return false;
     sink_->loadAndPlay(it->second.lba, it->second.sectorCount);
     sink_->play();
-    return;
+    return true;
   }
 
   if (itemRef.kind == ItemRef::Kind::Entry) {
-    if (itemRef.entryIndex < 0 || static_cast<size_t>(itemRef.entryIndex) >= entriesFile_.entries.size()) return;
+    if (itemRef.entryIndex < 0 || static_cast<size_t>(itemRef.entryIndex) >= entriesFile_.entries.size()) return false;
     const EntriesEntry& entry = entriesFile_.entries[itemRef.entryIndex];
     const auto it = trackStreams_.find(entry.track);
-    if (it == trackStreams_.end()) return;
+    if (it == trackStreams_.end()) return false;
     const int64_t startSector = std::max<int64_t>(0, entry.isoLba - it->second.lba);
     sink_->loadAndPlay(it->second.lba + startSector, it->second.sectorCount - startSector);
     sink_->play();
+    return true;
   }
+
+  return false;  // None/Unknown: nothing to play
 }
 
 void PbcEngine::onEof() {
@@ -125,17 +149,21 @@ void PbcEngine::onEof() {
 
   if (!currentDescriptor_) return;
   const PsdDescriptor& d = *currentDescriptor_;
-  // The two branches call goTo() identically on purpose: they're reached for
-  // different reasons (a real playlist vs. a non-interactive selection node)
-  // even though the resulting action is the same.
-  // NOLINTNEXTLINE(bugprone-branch-clone)
-  if (d.type == PsdType::Playlist && d.nextOfs.kind == PsdOfs::Kind::Offset) {
-    goTo(d.nextOfs.byteOffset);
-  } else if (d.type == PsdType::Selection && d.choices.empty() && d.nextOfs.kind == PsdOfs::Kind::Offset) {
-    // Non-interactive node (nos=0): behaves like a playlist, advances automatically.
-    goTo(d.nextOfs.byteOffset);
+  if (d.type == PsdType::Playlist) {
+    if (d.nextOfs.kind == PsdOfs::Kind::Offset) goTo(d.nextOfs.byteOffset);
+    return;
   }
-  // Node with numeric choices: once playback ends, it waits for user input.
+  if (d.type == PsdType::Selection) {
+    // Replay the item until its loop count runs out, then start waiting
+    // (once: a stray EOF after that must not restart the item).
+    if (selectionPlaysLeft_ < 0 || selectionPlaysLeft_ > 1) {
+      if (selectionPlaysLeft_ > 1) selectionPlaysLeft_--;
+      playItemRef(d.item.ref);
+    } else if (selectionPlaysLeft_ == 1) {
+      selectionPlaysLeft_ = 0;
+      startSelectionWait();
+    }
+  }
 }
 
 void PbcEngine::onRemoteButton(RemoteButton btn, int number) {

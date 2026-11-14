@@ -80,7 +80,10 @@ class PbcEngine {
 
  private:
   void goTo(std::optional<int64_t> byteOffset);
-  void playItemRef(const ItemRef& ref);
+  // Returns false if the item can't be played (none, unknown, unresolved).
+  bool playItemRef(const ItemRef& ref);
+  // Selection node whose item finished playing: wait `totime`, then jump.
+  void startSelectionWait();
   void playPlainTrack(int trackNumber);
   void end();
   void notify();
@@ -96,6 +99,7 @@ class PbcEngine {
 
   std::optional<PsdDescriptor> currentDescriptor_;
   std::optional<int> plainTrack_;
+  int selectionPlaysLeft_ = 1;  // -1 = loop forever
   bool ended_ = false;
 };
 
