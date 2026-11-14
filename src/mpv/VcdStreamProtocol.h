@@ -3,6 +3,8 @@
 #include <mpv/client.h>
 
 #include <cstdint>
+#include <mutex>
+#include <optional>
 #include <string>
 #include <vector>
 
@@ -38,9 +40,14 @@ class VcdStreamRegistry {
     int64_t sectorCount = 0;
   };
 
-  const StreamDef* find(int id) const;
+  // Thread-safe: called from mpv's demuxer thread (OpenCb) while the UI
+  // thread may be registering the next stream. Returns a copy, never a
+  // pointer into streams_, which a concurrent registerStream() can
+  // reallocate.
+  std::optional<StreamDef> find(int id) const;
 
  private:
+  mutable std::mutex mutex_;
   std::vector<StreamDef> streams_;
 };
 

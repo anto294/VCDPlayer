@@ -73,7 +73,7 @@ int OpenCb(void* userData, char* uri, mpv_stream_cb_info* info) {
   } catch (const std::exception&) {
     return MPV_ERROR_LOADING_FAILED;
   }
-  const VcdStreamRegistry::StreamDef* def = registry->find(id);
+  const std::optional<VcdStreamRegistry::StreamDef> def = registry->find(id);
   if (!def) return MPV_ERROR_LOADING_FAILED;
 
   auto* cookie = new StreamCookie();
@@ -99,6 +99,7 @@ int OpenCb(void* userData, char* uri, mpv_stream_cb_info* info) {
 }  // namespace
 
 std::string VcdStreamRegistry::registerStream(DiscImage image, int64_t lba, int64_t sectorCount) {
+  const std::lock_guard<std::mutex> lock(mutex_);
   const int id = static_cast<int>(streams_.size());
   streams_.push_back(StreamDef{std::move(image), lba, sectorCount});
   return "vcdxa://" + std::to_string(id);
@@ -106,9 +107,10 @@ std::string VcdStreamRegistry::registerStream(DiscImage image, int64_t lba, int6
 
 void VcdStreamRegistry::installOn(mpv_handle* mpv) { mpv_stream_cb_add_ro(mpv, "vcdxa", this, OpenCb); }
 
-const VcdStreamRegistry::StreamDef* VcdStreamRegistry::find(int id) const {
-  if (id < 0 || static_cast<size_t>(id) >= streams_.size()) return nullptr;
-  return &streams_[id];
+std::optional<VcdStreamRegistry::StreamDef> VcdStreamRegistry::find(int id) const {
+  const std::lock_guard<std::mutex> lock(mutex_);
+  if (id < 0 || static_cast<size_t>(id) >= streams_.size()) return std::nullopt;
+  return streams_[id];
 }
 
 }  // namespace vcd
