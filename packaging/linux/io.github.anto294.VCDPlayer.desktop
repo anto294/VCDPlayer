@@ -1,0 +1,14 @@
+[Desktop Entry]
+Type=Application
+Name=VCD Player
+GenericName=Video CD Player
+GenericName[it]=Lettore Video CD
+Comment=Play Video CD disc images with their menus
+Comment[it]=Riproduci le immagini dei Video CD con i loro menu
+Exec=VCDPlayer %f
+Icon=io.github.anto294.VCDPlayer
+Terminal=false
+Categories=AudioVideo;Video;Player;
+MimeType=application/x-cue;
+Keywords=vcd;video cd;cue;bin;karaoke;pbc;
+Keywords[it]=vcd;video cd;cue;bin;karaoke;pbc;lettore;

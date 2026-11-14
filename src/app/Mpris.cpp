@@ -75,9 +75,9 @@ void Mpris::notifyChanged(const QVariantMap& changed) {
 }
 
 QString MprisRootAdaptor::desktopEntry() const {
-  // The .desktop file name without extension: set by the Flatpak/AppImage
-  // packaging, so desktops can show the right icon and name.
-  return QStringLiteral("vcdplayer");
+  // The .desktop file's name without extension (packaging/linux/), so the
+  // desktop can show the app's own name and icon for it.
+  return QStringLiteral("io.github.anto294.VCDPlayer");
 }
 
 MprisPlayerAdaptor::MprisPlayerAdaptor(Mpris* mpris) : QDBusAbstractAdaptor(mpris), mpris_(mpris) {

@@ -135,3 +135,23 @@ add_custom_command(TARGET VCDPlayer POST_BUILD
         ${CMAKE_SOURCE_DIR}/shaders
         $<TARGET_FILE_DIR:VCDPlayer>/shaders
 )
+
+# Installed layout for system packages (.deb, Flatpak): binary in bin/,
+# shaders in share/vcdplayer/shaders (where the app also looks, next to
+# its executable's ../share), desktop entry with the .cue association,
+# AppStream metadata and the icon set, all under the reverse-DNS app id.
+if(UNIX AND NOT APPLE)
+    include(GNUInstallDirs)
+    set(VCDPLAYER_APP_ID io.github.anto294.VCDPlayer)
+    install(TARGETS VCDPlayer RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR})
+    install(DIRECTORY shaders/ DESTINATION ${CMAKE_INSTALL_DATADIR}/vcdplayer/shaders)
+    install(FILES packaging/linux/${VCDPLAYER_APP_ID}.desktop
+            DESTINATION ${CMAKE_INSTALL_DATADIR}/applications)
+    install(FILES packaging/linux/${VCDPLAYER_APP_ID}.metainfo.xml
+            DESTINATION ${CMAKE_INSTALL_DATADIR}/metainfo)
+    foreach(size 16 32 48 64 128 256 512)
+        install(FILES img/icon/${size}.png
+                DESTINATION ${CMAKE_INSTALL_DATADIR}/icons/hicolor/${size}x${size}/apps
+                RENAME ${VCDPLAYER_APP_ID}.png)
+    endforeach()
+endif()

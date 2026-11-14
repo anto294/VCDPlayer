@@ -26,14 +26,12 @@ cp "$exe" "$appdir/usr/bin/"
 shaders_dir="$(dirname "$exe")/shaders"
 [ -d "$shaders_dir" ] && cp -r "$shaders_dir" "$appdir/usr/bin/"
 
-cat > "$workdir/vcdplayer.desktop" <<EOF
-[Desktop Entry]
-Type=Application
-Name=VCD Player
-Exec=VCDPlayer
-Icon=vcdplayer
-Categories=AudioVideo;Player;
-EOF
+# The same desktop entry (with the .cue file association) and AppStream
+# metadata the .deb and Flatpak install, see packaging/linux/.
+app_id="io.github.anto294.VCDPlayer"
+mkdir -p "$appdir/usr/share/metainfo"
+cp "$repo_root/packaging/linux/$app_id.metainfo.xml" "$appdir/usr/share/metainfo/"
+cp "$repo_root/img/icon/256.png" "$workdir/$app_id.png"
 
 # Pre-rendered sizes (see img/icon/, generated from img/icon-nobg.png) go
 # straight into the AppDir's hicolor icon theme, so the AppImage carries a
@@ -43,7 +41,7 @@ EOF
 for size in 16 32 48 64 128 256 512; do
   theme_dir="$appdir/usr/share/icons/hicolor/${size}x${size}/apps"
   mkdir -p "$theme_dir"
-  cp "$repo_root/img/icon/${size}.png" "$theme_dir/vcdplayer.png"
+  cp "$repo_root/img/icon/${size}.png" "$theme_dir/$app_id.png"
 done
 
 # CI sets LINUXDEPLOY_CACHE_DIR to a path it persists with actions/cache, so
@@ -79,8 +77,8 @@ cd "$workdir"
 PATH="$tools_dir:$PATH" "$tools_dir/linuxdeploy" \
   --appdir "$appdir" \
   --executable "$appdir/usr/bin/$(basename "$exe")" \
-  --desktop-file "$workdir/vcdplayer.desktop" \
-  --icon-file "$repo_root/img/icon/256.png" \
+  --desktop-file "$repo_root/packaging/linux/$app_id.desktop" \
+  --icon-file "$workdir/$app_id.png" \
   --plugin qt
 
 # linuxdeploy-plugin-qt deploys the Wayland shell-integration and

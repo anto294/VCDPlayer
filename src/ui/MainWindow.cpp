@@ -115,15 +115,24 @@ const std::vector<UpscalerPreset>& UpscalerPresets() {
   return kPresets;
 }
 
+// Where the bundled shaders are: next to the executable (build tree,
+// portable zip, AppImage), or ../share/vcdplayer/shaders for an installed
+// system package (.deb, Flatpak), see the install rules in CMakeLists.txt.
+QString ShaderDir() {
+  const QString appDir = QCoreApplication::applicationDirPath();
+  if (QDir(appDir + QStringLiteral("/shaders")).exists()) return appDir + QStringLiteral("/shaders");
+  return QDir::cleanPath(appDir + QStringLiteral("/../share/vcdplayer/shaders"));
+}
+
 // mpv's glsl-shaders value for a preset: full paths, joined with the
 // platform's path-list separator (':' on Unix, ';' on Windows). Shaders are
-// plain files next to the executable (see the CMakeLists.txt copy step),
-// not Qt resources: mpv reads them by path and knows nothing of :/ paths.
+// plain files (see ShaderDir()), not Qt resources: mpv reads them by path
+// and knows nothing of :/ paths.
 QString UpscalerShaderList(const QString& id) {
   QStringList paths;
   for (const UpscalerPreset& p : UpscalerPresets()) {
     if (id != QLatin1String(p.id)) continue;
-    for (const QString& f : p.files) paths << QCoreApplication::applicationDirPath() + QStringLiteral("/shaders/") + f;
+    for (const QString& f : p.files) paths << ShaderDir() + QLatin1Char('/') + f;
   }
   return paths.join(QDir::listSeparator());
 }

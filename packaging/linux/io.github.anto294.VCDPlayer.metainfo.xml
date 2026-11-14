@@ -1,0 +1,43 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<component type="desktop-application">
+  <id>io.github.anto294.VCDPlayer</id>
+  <metadata_license>CC0-1.0</metadata_license>
+  <project_license>GPL-3.0-or-later</project_license>
+  <name>VCD Player</name>
+  <summary>Play Video CD disc images with their menus</summary>
+  <summary xml:lang="it">Riproduci le immagini dei Video CD con i loro menu</summary>
+  <developer id="io.github.anto294">
+    <name>anto294</name>
+  </developer>
+  <description>
+    <p>
+      A player for Video CD disc images (.cue/.bin) that behaves like a
+      hardware VCD player: it follows the disc's own menus (PBC, Playback
+      Control), so you pick items with the number keys of an on-screen
+      remote control.
+    </p>
+    <ul>
+      <li>Full PBC menu navigation, or plain track-by-track playback</li>
+      <li>Chapter list, resume where you left off, recent discs</li>
+      <li>Karaoke channel selection (vocals on or off)</li>
+      <li>Optional GPU upscaling shaders for the low-resolution video</li>
+    </ul>
+  </description>
+  <launchable type="desktop-id">io.github.anto294.VCDPlayer.desktop</launchable>
+  <url type="homepage">https://github.com/anto294/VCDPlayer</url>
+  <url type="bugtracker">https://github.com/anto294/VCDPlayer/issues</url>
+  <provides>
+    <binary>VCDPlayer</binary>
+    <mediatype>application/x-cue</mediatype>
+  </provides>
+  <categories>
+    <category>AudioVideo</category>
+    <category>Video</category>
+    <category>Player</category>
+  </categories>
+  <content_rating type="oars-1.1"/>
+  <releases>
+    <release version="1.1.0" date="2026-11-14"/>
+    <release version="1.0.0" date="2026-11-14"/>
+  </releases>
+</component>
