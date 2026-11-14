@@ -9,14 +9,16 @@
 DiscSession::DiscSession(MpvPlayer* player, QObject* parent) : QObject(parent), player_(player) {
   registry_.installOn(player_->handle());
 
-  timeoutTimer_ = new QTimer(this);
-  timeoutTimer_->setSingleShot(true);
-  connect(timeoutTimer_, &QTimer::timeout, this, [this]() {
-    if (!pendingTimeoutCb_) return;
-    const std::function<void()> cb = std::move(pendingTimeoutCb_);
-    pendingTimeoutCb_ = nullptr;
-    cb();
-  });
+  for (PendingTimer* t : {&navigationTimer_, &digitEntryTimer_}) {
+    t->timer = new QTimer(this);
+    t->timer->setSingleShot(true);
+    connect(t->timer, &QTimer::timeout, this, [t]() {
+      if (!t->cb) return;
+      const std::function<void()> cb = std::move(t->cb);
+      t->cb = nullptr;
+      cb();
+    });
+  }
 
   connect(player_, &MpvPlayer::endFile, this, &DiscSession::onMpvEndFile);
 }
@@ -30,14 +32,14 @@ bool DiscSession::openDiscPath(const QString& cuePath, QString* errorMessage) {
     return false;
   }
 
-  cancelTimeout();
+  cancelAllTimeouts();
   pbc_.reset();
   disc_ = std::move(loaded);
 
   pbc_ = std::make_unique<vcd::PbcEngine>(disc_->info, disc_->entriesFile, disc_->lot, disc_->psd, disc_->trackStreams,
                                           disc_->segmentStreams, this, this);
   pbc_->onStateChanged = [this](const vcd::PbcEngine::State& s) {
-    emit stateChanged(static_cast<int>(s.kind), s.choiceCount);
+    emit stateChanged(static_cast<int>(s.kind), s.choiceCount, s.firstChoice);
   };
 
   emit discLoaded(QString::fromStdString(disc_->volumeId), disc_->info.pbcEnabled,
@@ -60,14 +62,25 @@ void DiscSession::play() { player_->setPropertyFlag("pause", false); }
 
 void DiscSession::pause() { player_->setPropertyFlag("pause", true); }
 
-void DiscSession::scheduleTimeout(int64_t ms, std::function<void()> cb) {
-  pendingTimeoutCb_ = std::move(cb);
-  timeoutTimer_->start(static_cast<int>(ms));
+DiscSession::PendingTimer& DiscSession::timerFor(vcd::TimerId id) {
+  return id == vcd::TimerId::DigitEntry ? digitEntryTimer_ : navigationTimer_;
 }
 
-void DiscSession::cancelTimeout() {
-  timeoutTimer_->stop();
-  pendingTimeoutCb_ = nullptr;
+void DiscSession::scheduleTimeout(vcd::TimerId id, int64_t ms, std::function<void()> cb) {
+  PendingTimer& t = timerFor(id);
+  t.cb = std::move(cb);
+  t.timer->start(static_cast<int>(ms));
+}
+
+void DiscSession::cancelTimeout(vcd::TimerId id) {
+  PendingTimer& t = timerFor(id);
+  t.timer->stop();
+  t.cb = nullptr;
+}
+
+void DiscSession::cancelAllTimeouts() {
+  cancelTimeout(vcd::TimerId::Navigation);
+  cancelTimeout(vcd::TimerId::DigitEntry);
 }
 
 void DiscSession::onMpvEndFile(int reason) {

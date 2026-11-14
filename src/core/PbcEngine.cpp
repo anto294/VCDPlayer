@@ -40,7 +40,9 @@ void PbcEngine::playPlainTrack(int trackNumber) {
 }
 
 void PbcEngine::goTo(std::optional<int64_t> byteOffset) {
-  timerHost_->cancelTimeout();
+  timerHost_->cancelTimeout(TimerId::Navigation);
+  timerHost_->cancelTimeout(TimerId::DigitEntry);
+  pendingNumber_ = -1;
   if (!byteOffset) {
     end();
     return;
@@ -99,7 +101,7 @@ void PbcEngine::playNextPlaylistItem() {
   if (*waitMs == 0) {
     goTo(offset);
   } else {
-    timerHost_->scheduleTimeout(*waitMs, [this, offset]() { goTo(offset); });
+    timerHost_->scheduleTimeout(TimerId::Navigation, *waitMs, [this, offset]() { goTo(offset); });
   }
 }
 
@@ -121,7 +123,7 @@ void PbcEngine::startSelectionWait() {
   if (*waitMs == 0) {
     goTo(offset);
   } else {
-    timerHost_->scheduleTimeout(*waitMs, [this, offset]() { goTo(offset); });
+    timerHost_->scheduleTimeout(TimerId::Navigation, *waitMs, [this, offset]() { goTo(offset); });
   }
 }
 
@@ -190,9 +192,20 @@ void PbcEngine::onEof() {
 void PbcEngine::onRemoteButton(RemoteButton btn, int number) {
   const std::optional<PsdDescriptor>& d = currentDescriptor_;
   if (btn == RemoteButton::Number) {
-    if (d && d->type == PsdType::Selection && number >= 1 && number <= static_cast<int>(d->choices.size())) {
-      const PsdOfs& choice = d->choices[number - 1];
-      if (choice.kind == PsdOfs::Kind::Offset) goTo(choice.byteOffset);
+    if (!d || d->type != PsdType::Selection || d->choices.empty() || number < 0 || number > 9) return;
+    // Choices are numbered bsn .. bsn+nos-1 and can need more than one
+    // digit (10+ choices are common on karaoke discs). Digits accumulate;
+    // the number is committed as soon as no further digit could still
+    // make a valid choice, otherwise after a short pause, like the
+    // numeric entry of a hardware player.
+    constexpr int64_t kDigitEntryMs = 1500;
+    const int lastChoice = d->bsn + static_cast<int>(d->choices.size()) - 1;
+    pendingNumber_ = (pendingNumber_ < 0 ? 0 : pendingNumber_ * 10) + number;
+    timerHost_->cancelTimeout(TimerId::DigitEntry);
+    if (pendingNumber_ * 10 > lastChoice) {
+      commitTypedNumber();
+    } else {
+      timerHost_->scheduleTimeout(TimerId::DigitEntry, kDigitEntryMs, [this]() { commitTypedNumber(); });
     }
     return;
   }
@@ -218,6 +231,17 @@ void PbcEngine::onRemoteButton(RemoteButton btn, int number) {
   }
 }
 
+void PbcEngine::commitTypedNumber() {
+  const int number = pendingNumber_;
+  pendingNumber_ = -1;
+  const std::optional<PsdDescriptor>& d = currentDescriptor_;
+  if (!d || d->type != PsdType::Selection || number < 0) return;
+  const int index = number - d->bsn;
+  if (index < 0 || index >= static_cast<int>(d->choices.size())) return;
+  const PsdOfs& choice = d->choices[index];
+  if (choice.kind == PsdOfs::Kind::Offset) goTo(choice.byteOffset);
+}
+
 void PbcEngine::end() {
   ended_ = true;
   currentDescriptor_.reset();
@@ -232,7 +256,7 @@ PbcEngine::State PbcEngine::state() const {
   if (ended_) return State{State::Kind::End, 0};
   if (!currentDescriptor_) return State{State::Kind::Loading, 0};
   if (currentDescriptor_->type == PsdType::Selection && !currentDescriptor_->choices.empty()) {
-    return State{State::Kind::Menu, static_cast<int>(currentDescriptor_->choices.size())};
+    return State{State::Kind::Menu, static_cast<int>(currentDescriptor_->choices.size()), currentDescriptor_->bsn};
   }
   return State{State::Kind::Playing, 0};
 }

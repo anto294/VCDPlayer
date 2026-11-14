@@ -28,12 +28,18 @@ class IPlaybackSink {
   virtual void pause() = 0;
 };
 
-// Abstracts the autoPause/timeout timer for Selection nodes.
+// Abstracts the engine's one-shot timers. Each TimerId is independent;
+// scheduling one replaces whatever was pending on that same id.
+enum class TimerId {
+  Navigation,  // wait/timeout of the current play list or selection node
+  DigitEntry,  // commits a partially typed menu number
+};
+
 class ITimerHost {
  public:
   virtual ~ITimerHost() = default;
-  virtual void scheduleTimeout(int64_t ms, std::function<void()> cb) = 0;
-  virtual void cancelTimeout() = 0;
+  virtual void scheduleTimeout(TimerId id, int64_t ms, std::function<void()> cb) = 0;
+  virtual void cancelTimeout(TimerId id) = 0;
 };
 
 // Input from the "remote control". Stop has no dedicated case in the state
@@ -54,6 +60,7 @@ class PbcEngine {
     enum class Kind { Loading, Playing, Menu, End };
     Kind kind = Kind::Loading;
     int choiceCount = 0;
+    int firstChoice = 1;  // number of the first choice (the node's bsn)
   };
 
   PbcEngine(VcdInfo info, EntriesFile entriesFile, std::vector<uint8_t> lot, std::vector<uint8_t> psd,
@@ -89,6 +96,8 @@ class PbcEngine {
   void startSelectionWait();
   void playPlainTrack(int trackNumber);
   void end();
+  // Selects the menu choice numbered pendingNumber_, if it exists.
+  void commitTypedNumber();
   void notify();
 
   VcdInfo info_;
@@ -104,6 +113,7 @@ class PbcEngine {
   std::optional<int> plainTrack_;
   int selectionPlaysLeft_ = 1;  // -1 = loop forever
   int playlistIndex_ = -1;      // item of the current playlist being played
+  int pendingNumber_ = -1;      // menu number typed so far (-1 = none)
   bool ended_ = false;
 };
 

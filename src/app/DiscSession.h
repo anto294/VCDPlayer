@@ -35,7 +35,9 @@ class DiscSession : public QObject, public vcd::IPlaybackSink, public vcd::ITime
  signals:
   void discLoaded(QString volumeId, bool pbcEnabled, int chapters);
   // kind: vcd::PbcEngine::State::Kind converted to int (Loading=0, Playing=1, Menu=2, End=3).
-  void stateChanged(int kind, int choiceCount);
+  // firstChoice: number of the first menu choice (choices are numbered
+  // firstChoice .. firstChoice + choiceCount - 1).
+  void stateChanged(int kind, int choiceCount, int firstChoice);
 
  private:
   // vcd::IPlaybackSink
@@ -44,8 +46,9 @@ class DiscSession : public QObject, public vcd::IPlaybackSink, public vcd::ITime
   void pause() override;
 
   // vcd::ITimerHost
-  void scheduleTimeout(int64_t ms, std::function<void()> cb) override;
-  void cancelTimeout() override;
+  void scheduleTimeout(vcd::TimerId id, int64_t ms, std::function<void()> cb) override;
+  void cancelTimeout(vcd::TimerId id) override;
+  void cancelAllTimeouts();
 
   void onMpvEndFile(int reason);
 
@@ -53,6 +56,11 @@ class DiscSession : public QObject, public vcd::IPlaybackSink, public vcd::ITime
   vcd::VcdStreamRegistry registry_;
   std::unique_ptr<vcd::PbcEngine> pbc_;
   std::optional<vcd::LoadedDisc> disc_;
-  QTimer* timeoutTimer_;
-  std::function<void()> pendingTimeoutCb_;
+  struct PendingTimer {
+    QTimer* timer = nullptr;
+    std::function<void()> cb;
+  };
+  PendingTimer& timerFor(vcd::TimerId id);
+  PendingTimer navigationTimer_;
+  PendingTimer digitEntryTimer_;
 };

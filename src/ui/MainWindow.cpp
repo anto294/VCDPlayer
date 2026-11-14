@@ -267,7 +267,7 @@ MainWindow::MainWindow(QWidget* parent) : QMainWindow(parent) {
                                       : tr("Sequential playback · %1 chapters").arg(chapters);
     remote_->setDiscInfo(currentDiscTitle_, status);
   });
-  connect(session_, &DiscSession::stateChanged, this, [this](int kind, int choiceCount) {
+  connect(session_, &DiscSession::stateChanged, this, [this](int kind, int choiceCount, int firstChoice) {
     using Kind = vcd::PbcEngine::State::Kind;
     QString status;
     switch (static_cast<Kind>(kind)) {
@@ -275,7 +275,7 @@ MainWindow::MainWindow(QWidget* parent) : QMainWindow(parent) {
         status = tr("End of disc");
         break;
       case Kind::Menu:
-        status = tr("Menu — %1 choices (use the number keys)").arg(choiceCount);
+        status = tr("Menu — choose %1–%2 with the number keys").arg(firstChoice).arg(firstChoice + choiceCount - 1);
         break;
       case Kind::Playing:
         status = tr("Playing");
