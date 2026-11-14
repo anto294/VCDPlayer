@@ -19,6 +19,9 @@ Notable changes to VCD Player, release by release. Format loosely follows
   progress bar and time are shown by default.
 - The UI starts in Italian on Italian systems.
 - Unit tests for the disc-reading core, run in CI under ASan/UBSan.
+- GPU upscaling presets under **Experimental > GPU upscaling**: Anime4K
+  (cartoons, now with its artifact-removing Restore pass), FSRCNNX (live
+  action), RAVU, AMD FSR and AMD CAS sharpening.
 
 ### Changed
 
@@ -40,6 +43,8 @@ Notable changes to VCD Player, release by release. Format loosely follows
   playback instead of returning to the menu.
 - Hardware (OpenGL) rendering showed the video upside down.
 - Keyboard shortcuts stopped working in fullscreen.
+- The menu bar could be unreadable (dark text on dark background) with the
+  Breeze style when the KDE colour scheme couldn't be read.
 - The picture stayed on screen after Stop.
 - Corrupt or crafted disc images could crash the player or make it read
   past its buffers; they are now rejected with an error.
